@@ -161,6 +161,8 @@ inline uint32_t coords_to_index(int32_t x, int32_t z){
 }
 
 int get_column(column_t *column, nbt_node *coltree){
+
+	memset(column, 0, sizeof(column_t));
 	
 	nbt_node *leveltree = nbt_find_by_name(coltree, "Level");
 
@@ -178,37 +180,66 @@ int get_column(column_t *column, nbt_node *coltree){
 		return 1;
 	}
 
+	nbt_node *chunk_nodes[16];
+	for(uint32_t i=0;i<16;i++)
+		chunk_nodes[i] = NULL;
+
 	struct list_head* pos;
+
+	uint8_t highest_chunk = 0;
 
 	list_for_each(pos, &sections_list->entry){
 		nbt_node *section_node = list_entry(pos, struct nbt_list, entry)->data;
 		struct nbt_list* section_datalist = section_node->payload.tag_compound;
 		struct list_head* spos;
 		
-		printf("Ysection! %d: %s\n", section_node->type, section_node->name);
-		
+		//printf("Ysection! %d: %s\n", section_node->type, section_node->name);
+
 		list_for_each(spos, &section_datalist->entry){
-			printf("Subsection! ");
+			//printf("Subsection! ");
 			struct nbt_node* ydatanode = list_entry(spos, struct nbt_list, entry)->data;
 			if(ydatanode->name == NULL)
 				continue;
-			printf("GOT %d: %s\n", ydatanode->type, ydatanode->name);
+			//printf("GOT %d: %s\n", ydatanode->type, ydatanode->name);
 			if(strcmp(ydatanode->name, "Y") == 0){
-				printf("GOT Y=%d!\n", ydatanode->payload.tag_byte);
+				//printf("GOT Y=%d!\n", ydatanode->payload.tag_byte);
+				if(ydatanode->payload.tag_byte >= 16 || ydatanode->payload.tag_byte < 0){
+					die("Chunk Y out of range");
+				}
+				chunk_nodes[ydatanode->payload.tag_byte] = section_node;
+				if(ydatanode->payload.tag_byte > highest_chunk)
+					highest_chunk = ydatanode->payload.tag_byte;
 			}
 		}
 	}
 
-	/*nbt_node *blocks = nbt_find_by_name(leveltree, "Blocks");
+	for(uint8_t i=0;i<16;i++){
+		if(!chunk_nodes[i])
+			continue;
+		//printf("Filling chunk %d\n", i);
+		nbt_node *blocks = nbt_find_by_name(chunk_nodes[i], "Blocks");
+		if(!blocks){
+			die("Could not find Blocks tag");
+		}
+		if(blocks->type == TAG_BYTE_ARRAY){
+			struct nbt_byte_array *blocks_b = (struct nbt_byte_array*)&blocks->payload;
 
-	if ((blocks != NULL) && (blocks->type == TAG_BYTE_ARRAY)){
-		struct nbt_byte_array *blocks_b = (struct nbt_byte_array *)&blocks->payload;
+			if (blocks_b->length != 16*16*16)
+				die("Incorrect chunk size");
 
-		if (blocks_b->length == 16*16*16)
-			return 0;
-	}*/
+			for(uint32_t y=0;y<16;y++){
+				for(uint32_t x=0;x<16;x++){
+					for(uint32_t z=0;z<16;z++){
+						column->chunks[i].blocks[y][x][z].type = blocks_b->data[(y*16*16)+(x*16)+z];
+					}
+				}
+			}
+		}else{
+			die("Blocks tag is not a byte array");
+		}
+	}
 	
-	return 1;
+	return 0;
 }
 
 int main(int argc, char **argv){
@@ -226,15 +257,50 @@ int main(int argc, char **argv){
 	populate_coltable(regionfile, cat);
 
 	nbt_node *coltree = get_col_nbt(regionfile, &cat[coords_to_index(-255, 320)]);
+	//nbt_node *coltree = get_col_nbt(regionfile, &cat[coords_to_index(-240, 370)]);
 
 	column_t column;
 	if(get_column(&column, coltree))
 		die("Auw");
 
+	char watermap[16][16];
+
+	for(uint8_t z=0;z<16;z++){
+		for(uint8_t x=0;x<16;x++){
+			//watermap[x][z] = (column.chunks[3].blocks[14][x][z].type == 8 || column.chunks[3].blocks[14][x][z].type == 9)?'#':'-';
+			if(column.chunks[3].blocks[14][x][z].type == 8 || column.chunks[3].blocks[14][x][z].type == 9){
+				watermap[x][z] = '~';
+			}else if(column.chunks[3].blocks[14][x][z].type == 1){
+				watermap[x][z] = 'S';
+			}else if(column.chunks[3].blocks[14][x][z].type == 3 || column.chunks[3].blocks[14][x][z].type == 2){
+				watermap[x][z] = '#';
+			}else if(column.chunks[3].blocks[14][x][z].type == 12){
+				watermap[x][z] = 's';
+			}else if(column.chunks[3].blocks[14][x][z].type == 98){
+				watermap[x][z] = 'B';
+			}else{
+				watermap[x][z] = '.';
+				printf(";%d;", column.chunks[3].blocks[14][x][z].type);
+			}
+			//watermap[x][z] = (column.chunks[5].blocks[15][x][z].type != 0)?'#':'-';
+			//watermap[x][z] = column.chunks[2].blocks[15][x][z].type;
+		}
+	}
+
+	printf("Surface water at x[%d-%d], z[%d-%d]:\n", -255%16 * (-255),0,0,0);
+
+	for(uint8_t z=0;z<16;z++){
+		for(uint8_t x=0;x<16;x++){
+			putchar(watermap[x][15-z]);
+			//printf("%02x.",watermap[x][z]);
+		}
+		putchar('\n');
+	}
 
 	//char *tree_ascii = nbt_dump_ascii(coltree);
 	//puts(tree_ascii);
 
+	nbt_free(coltree);
 
 	return 0;
 }
