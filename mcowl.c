@@ -35,7 +35,8 @@
 #include <string.h>
 
 typedef struct{
-	
+	uint8_t type;
+	uint8_t data;
 } block_t;
 
 typedef struct{
@@ -44,11 +45,11 @@ typedef struct{
 } chunk_t;
 
 typedef struct{
-	chunk_t chunks[1*16*1];
+	chunk_t chunks[16];
 } column_t;
 
 typedef struct{
-	column_t columns[32*1*32];
+	column_t columns[32][32];
 } region_t;
 
 typedef struct{
@@ -59,7 +60,7 @@ typedef struct{
 typedef struct{
 	int32_t offset;
 	uint8_t length_sectors;
-} chunk_link_t;
+} col_link_t;
 
 static void die(const char* message){
 	fprintf(stderr, "%s\n", message);
@@ -85,7 +86,7 @@ static inline void* swap_bytes(void* s, size_t len){
 	return s;
 }
 
-int populate_chunktable(FILE *regionfile, chunk_link_t *cat){
+int populate_coltable(FILE *regionfile, col_link_t *cat){
 
 	uint32_t region_header[32*32];
 	
@@ -98,49 +99,43 @@ int populate_chunktable(FILE *regionfile, chunk_link_t *cat){
 		swap_bytes(&region_header[i], sizeof(uint32_t));
 		cat[i].offset = region_header[i]>>8;
 		cat[i].length_sectors = region_header[i] & 0xff;
-
-		//printf(" hex: %08x , offset: 0x%08x , sectors: % 3u\n", region_header[i], cat[i].offset, cat[i].length_sectors);
-		//get_chunk_nbt(regionfile, &cat[i]);
 	}
 	
 	return 0;
 }
 
-nbt_node* get_chunk_nbt(FILE *regionfile, chunk_link_t *chunk_link){
+nbt_node* get_col_nbt(FILE *regionfile, const col_link_t *col_link){
 
-	if(chunk_link->length_sectors == 0){
-		//printf("(caught empty chunk)\n");
+	if(col_link->length_sectors == 0){
 		return 0;
 	}
 	
-	if(fseek(regionfile, chunk_link->offset*4096, SEEK_SET))
-		die("Could not seek to chunk (region corrupt?)");
+	if(fseek(regionfile, col_link->offset*4096, SEEK_SET))
+		die("Could not seek to col (region corrupt?)");
 
 	FILE *tempfile = tmpfile();
 	if(!tempfile) die("Could not create temporary file");
 
-	uint8_t chunk_header[5];
-	size_t bytes_read = fread(chunk_header, 1, 5, regionfile);
+	uint8_t col_header[5];
+	size_t bytes_read = fread(col_header, 1, 5, regionfile);
 	if(bytes_read != 5)
-		die("Could not read chunk header, aborting");
+		die("Could not read col header, aborting");
 
-	int32_t chunk_length = (int32_t)((uint32_t)chunk_header[0]<<24 | (uint32_t)chunk_header[1]<<16 | (uint32_t)chunk_header[2]<<8 | (uint32_t)chunk_header[3]);
-	//swap_bytes(chunk_header, 4);
-	chunk_length = (int32_t)((uint32_t)chunk_header[0]<<24 | (uint32_t)chunk_header[1]<<16 | (uint32_t)chunk_header[2]<<8 | (uint32_t)chunk_header[3]);
-	uint8_t compression = chunk_header[4];
+	int32_t col_length = (int32_t)((uint32_t)col_header[0]<<24 | (uint32_t)col_header[1]<<16 | (uint32_t)col_header[2]<<8 | (uint32_t)col_header[3]);
 
-	//printf("  \\- hex: 0x%02x%02x%02x%02x%02x , ", chunk_header[0], chunk_header[1], chunk_header[2], chunk_header[3], chunk_header[4]);
-	//printf("length: 0x%08x , compression: 0x%02x\n", chunk_length, compression);
+	col_length = (int32_t)((uint32_t)col_header[0]<<24 | (uint32_t)col_header[1]<<16 | (uint32_t)col_header[2]<<8 | (uint32_t)col_header[3]);
 
-	if(chunk_length > 1024*1024)
-		die("Chunk too large!");
+	if(col_length > 1024*1024)
+		die("Column too large!");
 
-	uint8_t *chunk_data = (uint8_t*)malloc(chunk_length);
-	bytes_read = fread(chunk_data, 1, chunk_length, regionfile);
-	if(bytes_read != chunk_length)
-		die("Could not read chunk data, aborting");
+	uint8_t *col_data = (uint8_t*)malloc(col_length);
+	bytes_read = fread(col_data, 1, col_length, regionfile);
+	if(bytes_read != col_length)
+		die("Could not read column data, aborting");
 
-	fwrite(chunk_data, 1, chunk_length, tempfile);
+	size_t bytes_written = fwrite(col_data, 1, col_length, tempfile);
+	if(bytes_written != col_length)
+		die("Could not write column data to temporary file");
 	fseek(tempfile, 0, SEEK_SET);
 
 	nbt_node *tree = nbt_parse_file(tempfile);
@@ -151,7 +146,7 @@ nbt_node* get_chunk_nbt(FILE *regionfile, chunk_link_t *chunk_link){
 	return tree;
 }
 
-inline uint32_t chunk_coords_to_index(int32_t x, int32_t z){
+inline uint32_t col_coords_to_index(int32_t x, int32_t z){
 	return z*32 + x;
 }
 
@@ -162,9 +157,59 @@ inline uint32_t coords_to_index(int32_t x, int32_t z){
 		intra_x = 32 + intra_x;
 	if(intra_z < 0)
 		intra_z = 32 + intra_z;
-	return chunk_coords_to_index(intra_x, intra_z);
+	return col_coords_to_index(intra_x, intra_z);
 }
 
+int get_column(column_t *column, nbt_node *coltree){
+	
+	nbt_node *leveltree = nbt_find_by_name(coltree, "Level");
+
+	if((leveltree == NULL) || (strcmp(leveltree->name, "Level") != 0)
+			|| (leveltree->type != TAG_COMPOUND)){
+		return 1;
+	}
+	
+	nbt_node *sections = nbt_find_by_name(leveltree, "Sections");
+	struct nbt_list *sections_list = sections->payload.tag_compound;
+
+	if((sections == NULL) || (strcmp(sections->name, "Sections") != 0)
+			|| (sections->type != TAG_LIST)){
+		printf("SEC= %d: %s\n", sections->type, sections->name);
+		return 1;
+	}
+
+	struct list_head* pos;
+
+	list_for_each(pos, &sections_list->entry){
+		nbt_node *section_node = list_entry(pos, struct nbt_list, entry)->data;
+		struct nbt_list* section_datalist = section_node->payload.tag_compound;
+		struct list_head* spos;
+		
+		printf("Ysection! %d: %s\n", section_node->type, section_node->name);
+		
+		list_for_each(spos, &section_datalist->entry){
+			printf("Subsection! ");
+			struct nbt_node* ydatanode = list_entry(spos, struct nbt_list, entry)->data;
+			if(ydatanode->name == NULL)
+				continue;
+			printf("GOT %d: %s\n", ydatanode->type, ydatanode->name);
+			if(strcmp(ydatanode->name, "Y") == 0){
+				printf("GOT Y=%d!\n", ydatanode->payload.tag_byte);
+			}
+		}
+	}
+
+	/*nbt_node *blocks = nbt_find_by_name(leveltree, "Blocks");
+
+	if ((blocks != NULL) && (blocks->type == TAG_BYTE_ARRAY)){
+		struct nbt_byte_array *blocks_b = (struct nbt_byte_array *)&blocks->payload;
+
+		if (blocks_b->length == 16*16*16)
+			return 0;
+	}*/
+	
+	return 1;
+}
 
 int main(int argc, char **argv){
 	if(argc != 2){
@@ -177,13 +222,18 @@ int main(int argc, char **argv){
 		die("Could not open region file");
 
 
-	chunk_link_t cat[32*32];
-	populate_chunktable(regionfile, cat);
+	col_link_t cat[32*32];
+	populate_coltable(regionfile, cat);
 
-	nbt_node *tree = get_chunk_nbt(regionfile, &cat[coords_to_index(-255, 320)]);
+	nbt_node *coltree = get_col_nbt(regionfile, &cat[coords_to_index(-255, 320)]);
 
-	char *tree_ascii = nbt_dump_ascii(tree);
-	puts(tree_ascii);
+	column_t column;
+	if(get_column(&column, coltree))
+		die("Auw");
+
+
+	//char *tree_ascii = nbt_dump_ascii(coltree);
+	//puts(tree_ascii);
 
 
 	return 0;

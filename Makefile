@@ -1,4 +1,4 @@
-CFLAGS=-O1 -Wall -std=c99
+CFLAGS=-O1 -Wall -std=c99 -I../cnbt
 
 all: mcowl
 
