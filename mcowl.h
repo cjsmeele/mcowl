@@ -11,19 +11,21 @@
 #define DEBUG (1)
 
 #include "nbt.h"
+#include "pnm.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 
 
-#define die(text) do{fprintf(stderr, "[ERROR] %-12s %3d: %s\n", __FILE__, __LINE__, text); \
+#define die(text) do{fprintf(stderr, "[ERROR] %-14s %3d: %s\n", __FILE__, __LINE__, text); \
 		exit(1);}while(0)
 
 #define printf_d(format, ...) if(DEBUG){ \
-			fprintf(stderr, "[debug] %-12s %3d: ", __FILE__, __LINE__); \
+			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
 			fprintf(stderr, format "\n", __VA_ARGS__); \
 		}
 
@@ -31,7 +33,7 @@
 typedef struct{
 	uint8_t type;
 	//uint8_t light;
-	//uint8_t depth;
+	uint8_t depth;
 } block_t;
 
 typedef struct{
@@ -77,8 +79,7 @@ inline uint32_t coords_to_index(int32_t x, int32_t z){
 	return col_coords_to_index(intra_x, intra_z);
 }
 
-
-//int render_chunk_text(block_t chunk_map[16][16], char text_map[16][16]);
 int render_world_text(char **text_render, const block_t *world_map, uint32_t width, uint32_t height);
+int render_world_bitmap(bitmap_t *bitmap, const block_t *world_map, uint32_t width, uint32_t height);
 
 #endif /* MCOWL_H_ */

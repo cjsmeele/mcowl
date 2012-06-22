@@ -1,9 +1,9 @@
-CFLAGS=-O2 -Wall -std=c99 -I../../dev/cnbt
+CFLAGS=-O2 -Wall -std=c99 -I../../dev/cnbt -I../libpnm
 
 all: mcowl
 
-mcowl: mcowl.o render.o libnbt.a
-	$(CC) $(CFLAGS) mcowl.o render.o -L. -static -lnbt -lz -o mcowl
+mcowl: mcowl.o render.o
+	$(CC) $(CFLAGS) mcowl.o render.o -L../../dev/cnbt -L../libpnm -o mcowl -static -lnbt -lz -lpnm
 
 mcowl.o: mcowl.c mcowl.h
 render.o: render.c legend.h mcowl.h

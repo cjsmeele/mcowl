@@ -199,8 +199,10 @@ int get_column(column_t *column, nbt_node *coltree){
 }
 
 int get_filename(char *buffer, size_t buffer_len, const char *pathname){
-	if(strlen(pathname) < 1 || buffer_len < 1 || pathname[strlen(pathname)-1] == '/')
+	if(strlen(pathname) < 1 || buffer_len < 1 || pathname[strlen(pathname)-1] == '/' ||
+			pathname[strlen(pathname)-1] == '\\'){
 		return -1;
+	}
 	for(int64_t i=strlen(pathname)-1;i>=0;i--){
 		if(pathname[i] == '/'){
 			if(strlen(&pathname[i+1]) > buffer_len-1)
@@ -420,7 +422,7 @@ int map_world(block_t **world_map, uint32_t *world_width, uint32_t *world_height
 	}
 
 	int32_t regions_x = x_end - x_start + 1;
-	int32_t regions_z = z_end - z_start + 1;
+	//int32_t regions_z = z_end - z_start + 1;
 
 	//printf_d("x range: %d - %d (%d wide)", x_start, x_end, regions_x);
 	//printf_d("z range: %d - %d (%d long)", z_start, z_end, regions_z);
@@ -512,18 +514,36 @@ int main(int argc, char *argv[]){
 
 	map_world(&world_map, &world_width, &world_height, argv[1], argc-2, (const char**)argv+2);
 
+	printf_d("Rendering world map, %d x %d", world_width, world_height);
+
+	/*
 	char *text_render = 0;
-
 	render_world_text(&text_render, world_map, world_width, world_height);
-
 	puts("<pre>\n");
 	puts(text_render);
 	puts("</pre>\n");
+	if(text_render)
+		free(text_render);
+	*/
+
+
+	bitmap_t bitmap_render;
+	memset(&bitmap_render, 0, sizeof(bitmap_t));
+	render_world_bitmap(&bitmap_render, world_map, world_width, world_height);
+
+	if(!bitmap_render.pixels)
+		die("Render empty, no bitmap to write out!");
+
+	FILE *pnmfile = fopen("world.pnm", "wb");
+	if(!pnmfile)
+		die("Could not open pnm file for writing");
+	pnm_write(&bitmap_render, pnmfile);
+	fclose(pnmfile);
+	if(bitmap_render.pixels)
+		free(bitmap_render.pixels);
 
 	if(world_map)
 		free(world_map);
-	if(text_render)
-		free(text_render);
 
 	return 0;
 }
