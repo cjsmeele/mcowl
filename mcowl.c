@@ -49,8 +49,7 @@ nbt_node* get_column_nbt(FILE *regionfile, const col_link_t *col_link){
 		return 0;
 	}
 
-	int32_t col_length = (int32_t)((uint32_t)col_header[0]<<24 | (uint32_t)col_header[1]<<16 | (uint32_t)col_header[2]<<8 | (uint32_t)col_header[3]);
-	col_length = (int32_t)((uint32_t)col_header[0]<<24 | (uint32_t)col_header[1]<<16 | (uint32_t)col_header[2]<<8 | (uint32_t)col_header[3]);
+	uint32_t col_length = ((uint32_t)col_header[0]<<24 | (uint32_t)col_header[1]<<16 | (uint32_t)col_header[2]<<8 | (uint32_t)col_header[3]);
 
 	if(col_length > 1024*1024)
 		die("Column too large!");
@@ -324,7 +323,7 @@ int map_column(block_t column_map[16][16], FILE *regionfile, col_link_t *col_lin
 
 	nbt_free(col_tree);
 
-	uint8_t blocks_mapped = 0;
+	uint16_t blocks_mapped = 0;
 
 	for(int8_t i=15;i>=0;i--){
 		if(!(column.allocated_b & (1<<i)))

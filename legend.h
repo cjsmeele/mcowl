@@ -146,7 +146,7 @@ static const char text_legend[] = {
 	'.' //133
 };
 
-static uint8_t color_legend[][3] = {
+static const uint8_t color_legend[][3] = {
 	{0x10, 0x10, 0x10}, //000 air
 	{0x7f, 0x7f, 0x7f}, //001 stone
 	{0x47, 0xa5, 0x39}, //002 grass

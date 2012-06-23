@@ -1,4 +1,4 @@
-CFLAGS=-O2 -Wall -std=c99 -I../../dev/cnbt -I../libpnm
+CFLAGS=-O2 -Wall -pedantic -Wextra -std=c99 -I../../dev/cnbt -I../libpnm
 
 all: mcowl
 
@@ -12,6 +12,8 @@ render.o: render.c legend.h mcowl.h
 
 test: mcowl
 	./mcowl testworld testregions/mp/*.mca
+	convert world.pnm world.png
+
 #	./mcowl testworld testregions/mp/r.-1.0.mca testregions/mp/r.0.0.mca testregions/mp/r.-1.-1.mca
 #	./mcowl testworld testregions/mp/r.-1.0.mca testregions/mp/r.-1.-1.mca
 #	./mcowl testworld testregions/mp/r.-1.0.mca
