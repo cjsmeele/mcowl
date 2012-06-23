@@ -1,8 +1,29 @@
-/*
- * mcowl.h
+/* Copyright (c) 2012, Chris Johan Smeele
+ * All rights reserved.
  *
- *  Created on: Jun 20, 2012
- *      Author: chris
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *   * Redistributions of source code must retain the above copyright notice,
+ *       this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *       this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *   * Neither the name of cjsx9g nor the names of its contributors
+ *       may be used to endorse or promote products derived from this software
+ *       without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef MCOWL_H_
@@ -10,6 +31,9 @@
 
 #define DEBUG (1)
 
+/* mcowl uses FliPPeh's NBT library, which can be found here:
+ * https://github.com/FliPPeh/cNBT
+ */
 #include "nbt.h"
 #include "pnm.h"
 
@@ -33,7 +57,8 @@
 typedef struct{
 	uint8_t type;
 	//uint8_t light;
-	uint8_t depth;
+	int16_t depth;
+	uint8_t overlay_type;
 } block_t;
 
 typedef struct{
@@ -63,20 +88,6 @@ static inline void* swap_bytes(void* s, size_t len){
 	}
 
 	return s;
-}
-
-inline uint32_t col_coords_to_index(int32_t x, int32_t z){
-	return z*32 + x;
-}
-
-inline uint32_t coords_to_index(int32_t x, int32_t z){
-	int32_t intra_x = (x<0?(x/16-1):(x/16))%32;
-	int32_t intra_z = (z<0?(z/16-1):(z/16))%32;
-	if(intra_x < 0)
-		intra_x = 32 + intra_x;
-	if(intra_z < 0)
-		intra_z = 32 + intra_z;
-	return col_coords_to_index(intra_x, intra_z);
 }
 
 int render_world_text(char **text_render, const block_t *world_map, uint32_t width, uint32_t height);

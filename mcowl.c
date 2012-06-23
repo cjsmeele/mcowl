@@ -332,8 +332,14 @@ int map_column(block_t column_map[16][16], FILE *regionfile, col_link_t *col_lin
 			for(uint8_t x=0;x<16;x++){
 				for(uint8_t z=0;z<16;z++){
 					if(!column_map[x][z].type && column.chunks[i].blocks[y][z][x].type){
-						column_map[x][z].type = column.chunks[i].blocks[y][z][x].type;
-						blocks_mapped++;
+						if(!tranparency[column.chunks[i].blocks[y][z][x].type]){
+							column_map[x][z].type = column.chunks[i].blocks[y][z][x].type;
+							column_map[x][z].depth = i*16+y-64;
+							blocks_mapped++;
+						}else{
+							if(!column_map[x][z].overlay_type)
+								column_map[x][z].overlay_type = column.chunks[i].blocks[y][z][x].type;
+						}
 						if(blocks_mapped >= 16*16)
 							break;
 					}

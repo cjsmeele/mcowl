@@ -1,13 +1,143 @@
-/*
- * legend.h
- *
- *  Created on: Jun 20, 2012
- *      Author: chris
- */
-
 #ifndef LEGEND_H_
 #define LEGEND_H_
 
+
+static const uint8_t tranparency[] = {
+	255, //000 air
+	0, //001 stone
+	0, //002 grass
+	0, //003 dirt
+	0, //004 cobble
+	0, //005 planks
+	0, //006 sapling
+	0, //007 bedrock
+	20, //008 water
+	20, //009 water
+	0, //010 lava
+	0, //011 lava
+	0, //012 sand
+	0, //013 gravel
+	0, //014 gold ore
+	0, //015 iron ore
+	0, //016 coal ore
+	0, //017 wood
+	0, //018 leaves
+	0, //019 sponge
+	180, //020 glass
+	0, //021 lapis ore
+	0, //022 lapis
+	0, //023 dispenser
+	0, //024 sandstone
+	0, //025 noteblock
+	0, //026 bed
+	0, //027 powered rail
+	0, //028 detector rail
+	0, //029 sticky piston
+	0, //030 cobweb
+	0, //031 tall grass
+	0, //032 dead bush
+	0, //033
+	0, //034
+	0, //035 wool
+	0, //036
+	0, //037 yellow flower
+	0, //038 red flower
+	0, //039
+	0, //040
+	0, //041 gold block
+	0, //042 iron block
+	0, //043 double slabs
+	0, //044 slabs
+	0, //045 bricks
+	0, //046
+	0, //047
+	0, //048
+	0, //049
+	0, //050 torch
+	0, //051
+	0, //052
+	0, //053 wooden stairs
+	0, //054 chest
+	0, //055
+	0, //056
+	0, //057
+	0, //058
+	0, //059
+	0, //060
+	0, //061
+	0, //062
+	0, //063 sign
+	0, //064 wooden door
+	255, //065 ladder
+	0, //066
+	0, //067
+	255, //068 wall sign
+	0, //069
+	0, //070
+	0, //071 iron door
+	0, //072
+	0, //073
+	0, //074
+	0, //075 redstone torch off
+	0, //076 redstone torch on
+	0, //077
+	10, //078 snow
+	0, //079 ice
+	0, //080 snow block
+	0, //081 cactus
+	0, //082 clay
+	0, //083 reeds
+	0, //084
+	0, //085 fence
+	0, //086 pumpkin
+	0, //087
+	0, //088
+	0, //089 glowstone
+	0, //090
+	0, //091
+	0, //092
+	0, //093
+	0, //094
+	0, //095
+	0, //096
+	0, //097
+	0, //098 stonebrick
+	0, //099
+	0, //100
+	0, //101
+	0, //102
+	0, //103
+	0, //104
+	0, //105
+	0, //106
+	0, //107 fence gate
+	0, //108 brick stairs
+	0, //109 stonebrick stairs
+	0, //110
+	0, //111 lily pad
+	0, //112 nether brick
+	0, //113 nether fence
+	0, //114
+	0, //115
+	0, //116
+	0, //117
+	0, //118
+	0, //119
+	0, //120
+	0, //121
+	0, //122
+	0, //123 redstone lamp off
+	0, //124 redstone lamp on
+	0, //125
+	0, //126
+	0, //127
+	0, //128
+	0, //129
+	0, //130
+	0, //131
+	255, //132 tripwire
+	0  //133
+};
 
 static const char text_legend[] = {
 	' ', //000 air
@@ -16,7 +146,7 @@ static const char text_legend[] = {
 	',', //003 dirt
 	'*', //004 cobble
 	'H', //005 planks
-	'\'', //006 sapling
+	'\'',//006 sapling
 	'&', //007 bedrock
 	'~', //008 water
 	'~', //009 water
@@ -45,7 +175,7 @@ static const char text_legend[] = {
 	',', //032 dead bush
 	'.', //033
 	'.', //034
-	'.', //035
+	'.', //035 wool
 	'.', //036
 	';', //037 yellow flower
 	';', //038 red flower
@@ -63,7 +193,7 @@ static const char text_legend[] = {
 	'i', //050 torch
 	'.', //051
 	'.', //052
-	'.', //053
+	'.', //053 wooden stairs
 	'[', //054 chest
 	'.', //055
 	'.', //056
@@ -73,12 +203,12 @@ static const char text_legend[] = {
 	'.', //060
 	'.', //061
 	'.', //062
-	'.', //063
+	'.', //063 sign
 	'+', //064 wooden door
-	'.', //065
+	'.', //065 ladder
 	'.', //066
 	'.', //067
-	'.', //068
+	'.', //068 wall sign
 	'.', //069
 	'.', //070
 	'+', //071 iron door
@@ -90,16 +220,16 @@ static const char text_legend[] = {
 	'.', //077
 	':', //078 snow
 	'_', //079 ice
-	'.', //080
+	'.', //080 snow block
 	'c', //081 cactus
 	'C', //082 clay
-	'.', //083
+	'.', //083 reeds
 	'.', //084
-	'\\', //085 fence
-	'.', //086
+	'\\',//085 fence
+	'.', //086 pumpkin
 	'.', //087
 	'.', //088
-	'.', //089
+	'.', //089 glowstone
 	'.', //090
 	'.', //091
 	'.', //092
@@ -122,8 +252,8 @@ static const char text_legend[] = {
 	'b', //109 stonebrick stairs
 	'.', //110
 	'o', //111 lily pad
-	'.', //112
-	'\\', //113 nether fence
+	'.', //112 nether brick
+	'\\',//113 nether fence
 	'.', //114
 	'.', //115
 	'.', //116
@@ -133,8 +263,8 @@ static const char text_legend[] = {
 	'.', //120
 	'.', //121
 	'.', //122
-	'.', //123
-	'.', //124
+	'.', //123 redstone lamp off
+	'.', //124 redstone lamp on
 	'.', //125
 	'.', //126
 	'.', //127
@@ -142,7 +272,7 @@ static const char text_legend[] = {
 	'.', //129
 	'.', //130
 	'.', //131
-	'.', //132
+	'.', //132 tripwire
 	'.' //133
 };
 
@@ -279,7 +409,7 @@ static const uint8_t color_legend[][3] = {
 	{0x00, 0x00, 0x00}, //129
 	{0x00, 0x00, 0x00}, //130
 	{0x00, 0x00, 0x00}, //131
-	{0x00, 0x00, 0x00}, //132
+	{0x00, 0x00, 0x00}, //132 tripwire
 	{0x00, 0x00, 0x00} //133
 };
 
