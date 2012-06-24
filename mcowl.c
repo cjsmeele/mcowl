@@ -38,14 +38,11 @@ nbt_node* get_column_nbt(FILE *regionfile, const col_link_t *col_link){
 		printf_d("Could not seek to column at offset %d (region corrupt?)", col_link->offset);
 		return 0;
 	}
-	FILE *tempfile = tmpfile();
-	if(!tempfile) die("Could not create temporary file");
 
 	uint8_t col_header[5];
 	size_t bytes_read = fread(col_header, 1, 5, regionfile);
 	if(bytes_read != 5){
 		printf_d("Could not read column header, aborting (%d/%d bytes read)", (uint32_t)bytes_read, 5);
-		fclose(tempfile);
 		return 0;
 	}
 
@@ -59,17 +56,11 @@ nbt_node* get_column_nbt(FILE *regionfile, const col_link_t *col_link){
 	if(bytes_read != col_length)
 		die("Could not read column data, aborting");
 
-	size_t bytes_written = fwrite(col_data, 1, col_length, tempfile);
-	if(bytes_written != col_length)
-		die("Could not write column data to temporary file");
-	fseek(tempfile, 0, SEEK_SET);
-
-	nbt_node *tree = nbt_parse_file(tempfile);
+	nbt_node *tree = nbt_parse_compressed(col_data, col_length);
 	if(!tree){
-		fclose(tempfile);
+		printf_d("NBT error: %s", nbt_error_to_string(errno));
 		return 0;
 	}
-	fclose(tempfile);
 	return tree;
 }
 
