@@ -44,9 +44,46 @@
 #include <string.h>
 #include <assert.h>
 
+#define OS_OTHER 0
+#define OS_LINUX 1
+#define OS_WIN32 2
+#define OS_MACOS 3
+
+#ifndef OSTYPE
+	#if defined __linux__
+		#define OSTYPE OS_LINUX
+		#define OSNAME "linux"
+	#elif defined _WIN32
+		#define OSTYPE OS_WIN32
+		#define OSNAME "win32"
+	#elif defined __APPLE__
+		#define OSTYPE OS_MACOS
+		#define OSNAME "mac-os"
+	#else
+		#define OSTYPE OS_OTHER
+		#define OSNAME "unknown_target"
+	#endif
+#endif
+
+#if OSTYPE > OS_MACOS
+	#define OSTYPE OS_OTHER
+#endif
+
+#if OSTYPE < 0
+	#define OSTYPE OS_OTHER
+#endif
+
+#ifndef OSNAME
+	#define OSNAME "unknown_target"
+#endif
 
 #define die(text) do{fprintf(stderr, "[ERROR] %-14s %3d: %s\n", __FILE__, __LINE__, text); \
 		exit(1);}while(0)
+
+#define print_d(text) if(DEBUG){ \
+			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
+			fprintf(stderr, text "\n"); \
+		}
 
 #define printf_d(format, ...) if(DEBUG){ \
 			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \

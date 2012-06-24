@@ -203,7 +203,7 @@ int get_filename(char *buffer, size_t buffer_len, const char *pathname){
 		return -1;
 	}
 	for(int64_t i=strlen(pathname)-1;i>=0;i--){
-		if(pathname[i] == '/'){
+		if(pathname[i] == '/' || pathname[i] == '\\'){
 			if(strlen(&pathname[i+1]) > buffer_len-1)
 				return -1;
 			strcpy(buffer, &pathname[i+1]);
@@ -493,8 +493,8 @@ int main(int argc, char *argv[]){
 	}
 
 	fprintf(stderr, "mcowl 0.1, compiled on %s for %s\n",
-			__DATE__ " " __TIME__, "linux");
-	fprintf(stderr, "Copyright (c) 2012, Chris Johan Smeele\n"
+			__DATE__ " " __TIME__, OSNAME);
+	fprintf(stderr, "Copyright (c) 2012, Chris Smeele\n"
 			"All rights reserved.\n\n");
 
 	if(strlen(argv[1]) > 63 || !strlen(argv[1]))
@@ -536,6 +536,9 @@ int main(int argc, char *argv[]){
 	memset(&bitmap_render, 0, sizeof(bitmap_t));
 	render_world_bitmap(&bitmap_render, world_map, world_width, world_height);
 
+	if(world_map)
+		free(world_map);
+
 	if(!bitmap_render.pixels)
 		die("Render empty, no bitmap to write out!");
 
@@ -547,8 +550,73 @@ int main(int argc, char *argv[]){
 	if(bitmap_render.pixels)
 		free(bitmap_render.pixels);
 
-	if(world_map)
-		free(world_map);
+	print_d("Temporary image saved as 'world.pnm'");
+
+	FILE *pnm2png_check = 0;
+
+	char pngfilename[256];
+	sprintf(pngfilename, "mcowl-%s.png", worldname);
+
+	switch(OSTYPE){
+	case OS_LINUX:
+	case OS_MACOS:
+		pnm2png_check = fopen("pnm2png", "rb");
+		break;
+	case OS_WIN32:
+		pnm2png_check = fopen("pnm2png.exe", "rb");
+		break;
+	case OS_OTHER:
+	default:
+		printf("\n  Warning: Your OS type is specified as OTHER, or '%s'.\n"
+				"  I may not be able to find or call the pnm2png executable.\n\n", OSNAME);
+		pnm2png_check = fopen("pnm2png", "rb");
+		break;
+	}
+
+	int converter_exit = 7;
+
+	if(pnm2png_check){
+		fclose(pnm2png_check);
+		print_d("Trying to convert 'world.pnm' to a PNG file");
+		char command[256];
+
+		switch(OSTYPE){
+		case OS_OTHER:
+		case OS_LINUX:
+		case OS_MACOS:
+			sprintf(command, "./pnm2png %s", worldname);
+			break;
+		case OS_WIN32:
+			sprintf(command, "pnm2png.exe %s", worldname);
+			break;
+		default:
+			die("whooooooops");
+			break;
+		}
+		converter_exit = system(command);
+		if(converter_exit){
+			printf_d("pnm2png returned %d", converter_exit);
+			printf("\n  Either I could not execute pnm2png, or the program itself failed.\n"
+					"  If you're unhappy with the PNM file format, please convert it yourself.\n\n");
+		}else{
+			FILE *png_check = fopen(pngfilename, "rb");
+			if(png_check){
+				print_d("File successfully converted");
+				printf("\n  PNG file saved as '%s'!\n\n", pngfilename);
+				fclose(png_check);
+			}else{
+				print_d("pnm2png reports success, but I can't find the PNG file!");
+				printf("\n  It seems something went wrong while converting.\n"
+						"  See if you can find a PNG file in my directory.\n"
+						"  If the PNG file does not exist you can use a tool like The GIMP to convert\n"
+						"  the world.pnm file yourself. Sorry :)\n\n");
+			}
+		}
+	}else{
+		printf("\n  I could not find the pnm2png executable.\n"
+				"  If you're unhappy with the PNM file format, please convert it yourself.\n"
+				"  (The GIMP can handle PNM files)\n\n");
+	}
 
 	return 0;
 }
