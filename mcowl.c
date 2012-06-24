@@ -57,6 +57,8 @@ nbt_node* get_column_nbt(FILE *regionfile, const col_link_t *col_link){
 		die("Could not read column data, aborting");
 
 	nbt_node *tree = nbt_parse_compressed(col_data, col_length);
+
+	if(col_data) free(col_data);
 	if(!tree){
 		printf_d("NBT error: %s", nbt_error_to_string(errno));
 		return 0;
