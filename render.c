@@ -30,67 +30,39 @@
 #include "legend.h"
 
 
-int render_world_text(char **text_render, const block_t *world_map, uint32_t width, uint32_t height){
-	assert(world_map != NULL);
-
-	*text_render = (char*)malloc((width+1)*height+1);
-
-	if(!*text_render){
-		printf_d("Could not allocate %d bytes (%.1fKiB)", width*height+height+1, (double)(width*height+height+1) /1024);
-		die("Could not allocate text render buffer");
-	}
-
-	memset(*text_render, 0, (width+1)*height+1);
-	char *render = *text_render;
-
-	for(uint32_t z=0;z<height;z++){
-		for(uint32_t x=0;x<width;x++){
-			render[z*(width+1)+x] = world_map[z*width+x].type >= sizeof(text_legend)?'?':text_legend[world_map[z*width+x].type];
-		}
-		render[z*(width+1)+width] = '\n';
-	}
-
-	render[width*height+height] = 0;
-
-	return 0;
+int render_column_iso(){
+	print_d("Isometric mapping is not yet implemented");
+	return 2;
 }
 
-int render_world_bitmap(bitmap_t *bitmap, const block_t *world_map, uint32_t width, uint32_t height){
+int render_column_flat(bitmap_t *bitmap, block_t slice[16][16]){
 	assert(bitmap != NULL);
-	assert(world_map != NULL);
-
-	printf_d("Allocating %d bytes (%.1fMiB) for PNM pixel data", width*height*3, (float)(width*height*3)/1024/1024)
-	if(pnm_new(bitmap, width, height)){
-		printf_d("Could not allocate PNM buffer. Max size is set at %d bytes (%.1fMiB)", MAX_BITMAP_PIXELS*3, (float)(MAX_BITMAP_PIXELS*3)/1024/1024);
-		return 1;
-	}
 	assert(bitmap->pixels != NULL);
+	memset(bitmap->pixels, 0, bitmap->width*bitmap->height*3);
 
-	memset(bitmap->pixels, 0x00, width*height*3);
-
-	for(uint32_t z=0;z<height;z++){
-		for(uint32_t x=0;x<width;x++){
+	for(uint32_t z=0;z<16;z++){
+		for(uint32_t x=0;x<16;x++){
 			uint16_t color[3];
-			color[0] = world_map[z*width+x].type >= sizeof(color_legend)/3?0xff:color_legend[world_map[z*width+x].type][0];
-			color[1] = world_map[z*width+x].type >= sizeof(color_legend)/3?0xff:color_legend[world_map[z*width+x].type][1];
-			color[2] = world_map[z*width+x].type >= sizeof(color_legend)/3?0xff:color_legend[world_map[z*width+x].type][2];
+			color[0] = slice[x][z].type >= sizeof(color_legend)/3?0xff:color_legend[slice[x][z].type][0];
+			color[1] = slice[x][z].type >= sizeof(color_legend)/3?0xff:color_legend[slice[x][z].type][1];
+			color[2] = slice[x][z].type >= sizeof(color_legend)/3?0xff:color_legend[slice[x][z].type][2];
 
 			for(uint8_t color_i=0;color_i<3;color_i++){
-				if(world_map[z*width+x].overlay_type){
-					color[color_i] *= (double)((double)(tranparency[world_map[z*width+x].overlay_type])/256);
-					color[color_i] += (double)color_legend[world_map[z*width+x].overlay_type][color_i]/256 *
-							(256-tranparency[world_map[z*width+x].overlay_type]);
+				if(slice[x][z].overlay_type){
+					color[color_i] *= (double)((double)(tranparency[slice[x][z].overlay_type])/256);
+					color[color_i] += (double)color_legend[slice[x][z].overlay_type][color_i]/256 *
+							(256-tranparency[slice[x][z].overlay_type]);
 				}
 				double multiplier = 1;
-				int16_t depth = world_map[z*width+x].depth;
+				int16_t depth = slice[x][z].depth;
 				if(depth > 30){
 					multiplier = 1.5;
 				}else if(depth >= 0){
 					multiplier += (double)depth/30/2;
 				}else if(depth >= -30){
-					multiplier += (double)depth/30/1.5;
+					multiplier += (double)depth/30/2;
 				}else{
-					multiplier = 1/3;
+					multiplier = 0.5;
 				}
 
 				color[color_i] *= multiplier;
@@ -98,9 +70,9 @@ int render_world_bitmap(bitmap_t *bitmap, const block_t *world_map, uint32_t wid
 				if(color[color_i] > 255) color[color_i] = 255;
 			}
 
-			bitmap->pixels[(z*width+x)*3+0] = color[0];
-			bitmap->pixels[(z*width+x)*3+1] = color[1];
-			bitmap->pixels[(z*width+x)*3+2] = color[2];
+			bitmap->pixels[(z*16+x)*3+0] = color[0];
+			bitmap->pixels[(z*16+x)*3+1] = color[1];
+			bitmap->pixels[(z*16+x)*3+2] = color[2];
 		}
 	}
 

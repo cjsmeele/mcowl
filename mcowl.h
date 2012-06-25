@@ -90,6 +90,10 @@
 			fprintf(stderr, format "\n", __VA_ARGS__); \
 		}
 
+enum RenderMode{
+	RENDER_FLAT=1,
+	RENDER_ISOMETRIC
+};
 
 typedef struct{
 	uint8_t type;
@@ -127,7 +131,6 @@ static inline void* swap_bytes(void* s, size_t len){
 	return s;
 }
 
-int render_world_text(char **text_render, const block_t *world_map, uint32_t width, uint32_t height);
-int render_world_bitmap(bitmap_t *bitmap, const block_t *world_map, uint32_t width, uint32_t height);
+int render_column_flat(bitmap_t *bitmap, block_t slice[16][16]);
 
 #endif /* MCOWL_H_ */

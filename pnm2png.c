@@ -17,7 +17,7 @@
 
 #define MAX_PNM_FILESIZE (120*1024*1024)
 
-inline size_t get_filesize(FILE* file){
+size_t get_filesize(FILE* file){
 	if(!file){
 		return 0;
 	}
