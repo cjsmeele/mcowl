@@ -81,11 +81,19 @@ int render_world_bitmap(bitmap_t *bitmap, const block_t *world_map, uint32_t wid
 					color[color_i] += (double)color_legend[world_map[z*width+x].overlay_type][color_i]/256 *
 							(256-tranparency[world_map[z*width+x].overlay_type]);
 				}
-				if(world_map[z*width+x].depth < -1 &&
-						(world_map[z*width+x].overlay_type == 8 || world_map[z*width+x].overlay_type == 9))
-					color[color_i] *= 1+ (double)world_map[z*width+x].depth/32;
-				else
-					color[color_i] *= 1+ (double)world_map[z*width+x].depth/128;
+				double multiplier = 1;
+				int16_t depth = world_map[z*width+x].depth;
+				if(depth > 30){
+					multiplier = 1.5;
+				}else if(depth >= 0){
+					multiplier += (double)depth/30/2;
+				}else if(depth >= -30){
+					multiplier += (double)depth/30/1.5;
+				}else{
+					multiplier = 1/3;
+				}
+
+				color[color_i] *= multiplier;
 
 				if(color[color_i] > 255) color[color_i] = 255;
 			}

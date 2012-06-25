@@ -330,7 +330,8 @@ int map_column(block_t column_map[16][16], FILE *regionfile, col_link_t *col_lin
 							column_map[x][z].depth = i*16+y-64;
 							blocks_mapped++;
 						}else{
-							if(!column_map[x][z].overlay_type)
+							if(tranparency[column.chunks[i].blocks[y][z][x].type] != 255 &&
+									!column_map[x][z].overlay_type)
 								column_map[x][z].overlay_type = column.chunks[i].blocks[y][z][x].type;
 						}
 						if(blocks_mapped >= 16*16)
