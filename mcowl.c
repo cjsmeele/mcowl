@@ -44,6 +44,7 @@ size_t get_filesize(FILE* file){
 }
 
 int get_bitmaps_blocks(const char *filename){
+	memset(block_bitmaps, 0, 256*sizeof(bitmap_t));
 	FILE *bmp_blocks_file = fopen(filename, "rb");
 	if(!bmp_blocks_file){
 		printf_d("Could not open blocks bitmap table '%s'", filename);
@@ -71,6 +72,7 @@ int get_bitmaps_blocks(const char *filename){
 	return 0;
 }
 int get_bitmaps_data(const char *filename){
+	memset(data_bitmaps, 0, 16*16*sizeof(bitmap_t));
 	return 0;
 }
 
@@ -687,10 +689,12 @@ int map_world(bitmap_t *bitmap, const char *worldname, uint16_t region_count, co
 
 			}
 		}
-
 	}else{
 		return 1;
 	}
+
+	pnm_free(&region_bitmap);
+	pnm_free(&column_bitmap);
 
 	return 0;
 }
@@ -751,8 +755,7 @@ int main(int argc, char *argv[]){
 		die("Could not open pnm file for writing");
 	pnm_write(&bitmap_render, pnmfile);
 	fclose(pnmfile);
-	if(bitmap_render.pixels)
-		free(bitmap_render.pixels);
+	pnm_free(&bitmap_render);
 
 	print_d("Temporary image saved as 'world.pnm'");
 
