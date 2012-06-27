@@ -2,7 +2,7 @@
 #CFLAGS=-O2 -Wall -pedantic -Wextra -std=c99 -I../../dev/cnbt-mingw -I../libpnm -I/usr/i686-pc-mingw32/usr/include/libnpg15
 #LDFLAGS=-L../libpnm -L../../dev/cnbt-mingw -L/usr/i686-pc-mingw32/usr/lib64
 
-CFLAGS=-O2 -Wall -pedantic -Wextra -std=c99 -I../../dev/cnbt -I../libpnm -I/usr/include/libnpg15
+CFLAGS=-O0 -g3 -Wall -pedantic -Wextra -std=c99 -I../../dev/cnbt -I../libpnm -I/usr/include/libnpg15
 LDFLAGS=-L../libpnm -L../../dev/cnbt
 
 all: mcowl pnm2png
@@ -21,6 +21,7 @@ pnm2png.o: pnm2png.c
 
 test: mcowl pnm2png
 	./mcowl testworld testregions/loca/Midpoint/region/*.mca
+#	./mcowl testworld testregions/loca/Midpoint/region/r.-1.0.mca
 
 clean:
 	rm -f mcowl pnm2png *.o

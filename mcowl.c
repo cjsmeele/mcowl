@@ -30,6 +30,51 @@
 #include "legend.h"
 
 
+bitmap_t block_bitmaps[256];
+bitmap_t data_bitmaps[16][16];
+
+size_t get_filesize(FILE* file){
+	if(!file){
+		return 0;
+	}
+	fseek(file, 0, 2);
+	size_t size = ftell(file);
+	fseek(file, 0, 0);
+	return size;
+}
+
+int get_bitmaps_blocks(const char *filename){
+	FILE *bmp_blocks_file = fopen(filename, "rb");
+	if(!bmp_blocks_file){
+		printf_d("Could not open blocks bitmap table '%s'", filename);
+		return 1;
+	}
+
+	size_t filesize = get_filesize(bmp_blocks_file);
+
+	uint8_t *bmp_blocks = malloc(filesize);
+	if(!bmp_blocks) die("Could not allocate blocks bitmap file buffer");
+
+	size_t bytes_read = fread(bmp_blocks, 1, filesize, bmp_blocks_file);
+	if(bytes_read != filesize){
+		printf_d("Could not read blocks bitmap file (%u/%u bytes read)", (uint32_t)bytes_read, (uint32_t)filesize);
+		fclose(bmp_blocks_file);
+		return 1;
+	}
+	fclose(bmp_blocks_file);
+
+	if(pnm_parse_bulk(block_bitmaps, ISOMETRIC_BLOCK_SIZE, ISOMETRIC_BLOCK_SIZE, bmp_blocks, filesize, false)){
+		print_d("Could not parse block bitmaps");
+		return 1;
+	}
+
+	return 0;
+}
+int get_bitmaps_data(const char *filename){
+	return 0;
+}
+
+
 nbt_node* get_column_nbt(FILE *regionfile, const col_link_t *col_link){
 	if(col_link->length_sectors == 0){
 		return 0;
@@ -298,50 +343,109 @@ int check_allocated_regions(const char *region_allocation_map[64][64], const cha
 }
 
 int map_column(bitmap_t *bitmap, FILE *regionfile, col_link_t *col_link, int rendermode){
-	assert(rendermode == RENDER_FLAT);
-	memset(bitmap->pixels, 0, 16*16*3);
+	if(rendermode == RENDER_FLAT){
+		memset(bitmap->pixels, 0, 16*16*3);
 
-	block_t column_map[16][16];
-	memset(column_map, 0, 16*16*sizeof(block_t));
+		block_t column_map[16][16];
+		memset(column_map, 0, 16*16*sizeof(block_t));
 
-	column_t column;
+		column_t column;
 
-	nbt_node *col_tree = get_column_nbt(regionfile, col_link);
-	if(!col_tree){
-		printf_d("Could not map column: Could not get column NBT data from region file (offset: %d)", col_link->offset);
-		return 1;
-	}
+		nbt_node *col_tree = get_column_nbt(regionfile, col_link);
+		if(!col_tree){
+			printf_d("Could not map column: Could not get column NBT data from region file (offset: %d)", col_link->offset);
+			return 1;
+		}
+		get_column(&column, col_tree);
+		nbt_free(col_tree);
 
-	get_column(&column, col_tree);
+		uint16_t blocks_mapped = 0;
 
-	nbt_free(col_tree);
-
-	uint16_t blocks_mapped = 0;
-
-	for(int8_t i=15;i>=0;i--){
-		if(!(column.allocated_b & (1<<i)))
-			continue;
-		for(int8_t y=15;y>=0;y--){
-			for(uint8_t x=0;x<16;x++){
-				for(uint8_t z=0;z<16;z++){
-					if(!column_map[z][x].type && column.chunks[i].blocks[y][z][x].type){
-						if(!tranparency[column.chunks[i].blocks[y][z][x].type]){
-							column_map[z][x].type = column.chunks[i].blocks[y][z][x].type;
-							column_map[z][x].depth = i*16+y-64;
-							blocks_mapped++;
-						}else{
-							if(tranparency[column.chunks[i].blocks[y][z][x].type] != 255 &&
-									!column_map[z][x].overlay_type)
-								column_map[z][x].overlay_type = column.chunks[i].blocks[y][z][x].type;
+		for(int8_t i=15;i>=0;i--){
+			if(!(column.allocated_b & (1<<i)))
+				continue;
+			for(int8_t y=15;y>=0;y--){
+				for(uint8_t x=0;x<16;x++){
+					for(uint8_t z=0;z<16;z++){
+						if(!column_map[z][x].type && column.chunks[i].blocks[y][z][x].type){
+							if(!tranparency[column.chunks[i].blocks[y][z][x].type]){
+								column_map[z][x].type = column.chunks[i].blocks[y][z][x].type;
+								column_map[z][x].depth = i*16+y-64;
+								blocks_mapped++;
+							}else{
+								if(tranparency[column.chunks[i].blocks[y][z][x].type] != 255 &&
+										!column_map[z][x].overlay_type)
+									column_map[z][x].overlay_type = column.chunks[i].blocks[y][z][x].type;
+							}
+							if(blocks_mapped >= 16*16)
+								break;
 						}
-						if(blocks_mapped >= 16*16)
-							break;
 					}
 				}
 			}
 		}
+		render_column_flat(bitmap, column_map);
+	}else{
+		int32_t s = ISOMETRIC_BLOCK_SIZE;
+		memset(bitmap->pixels, 0, (15*(s+2)+s) * ((s+2)*16+(s/2+1-2)*256));
+
+		column_t column;
+
+		nbt_node *col_tree = get_column_nbt(regionfile, col_link);
+		if(!col_tree){
+			printf_d("Could not map column: Could not get column NBT data from region file (offset: %d)", col_link->offset);
+			return 1;
+		}
+		get_column(&column, col_tree);
+		nbt_free(col_tree);
+
+		int32_t i_start_z = 0;
+		int32_t i_start_x = 0;
+		int32_t i_end_z = 0;
+		int32_t i_end_x = 0;
+
+		for(uint32_t ia=0;ia<32;ia++){
+			if(ia < 16){
+				i_start_z = ia;
+				i_start_x = 0;
+				i_end_z = 0;
+				i_end_x = ia;
+			}else{
+				i_start_z = 15;
+				i_start_x = ia%16+1;
+				i_end_z = ia%16-1;
+				i_end_x = 15;
+			}
+			int32_t z, x;
+
+			for(z=i_start_z, x=i_start_x;
+					z >= i_end_z && x <= i_end_x;
+					z--, x++){
+				int32_t real_z = ia*((s+2)/2/2);
+				int32_t real_x = x*((s+2)/2) + (15-z)*((s+2)/2);
+
+				for(int16_t chunk_y=0;chunk_y<16;chunk_y++){
+					for(int16_t block_y=0;block_y<16;block_y++){
+						int32_t block_y_total = chunk_y*16+block_y;
+						real_z = ia*((s+2)/2/2) + ((s/2+1-2)*(255-block_y_total));
+						//bitmap->pixels[(real_z*(15*16+s)+real_x)*3+1] = 0xff;
+						uint8_t b = column.chunks[chunk_y].blocks[block_y][x][z].type;
+						for(int32_t pz=0;pz<s;pz++){
+							for(int32_t px=0;px<s;px++){
+								if(!(block_bitmaps[b].pixels[(pz*s+px)*3+0] == 255 &&
+										block_bitmaps[b].pixels[(pz*s+px)*3+1] == 0 &&
+										block_bitmaps[b].pixels[(pz*s+px)*3+2] == 255)){
+									memcpy(&bitmap->pixels[((real_z+pz)*(15*(s+2)+s)+real_x+px)*3],
+											&block_bitmaps[b].pixels[(pz*s+px)*3], 3);
+								}
+							}
+						}
+					}
+				}
+				//printf_d("ia: %d  %d,%d  =>  %d,%d", ia, z,x, real_z,real_x);
+			}
+		}
 	}
-	render_column_flat(bitmap, column_map);
 
 	return 0;
 }
@@ -366,6 +470,7 @@ int map_region(bitmap_t *bitmap, bitmap_t *column_bitmap, FILE *regionfile, int 
 			block_t column_map[16][16];
 			memset(column_map, 0, 16*16*sizeof(block_t));
 			if(cat[x*32+z].length_sectors){
+				memset(column_bitmap->pixels, 0, 16*16*3);
 				map_column(column_bitmap, regionfile, &cat[x*32+z], rendermode);
 				for(uint8_t cx=0;cx<16;cx++){
 					for(uint8_t cz=0;cz<16;cz++){
@@ -383,10 +488,9 @@ int map_world(bitmap_t *bitmap, const char *worldname, uint16_t region_count, co
 	printf_d("Mapping world \"%s\"", worldname);
 
 	if(rendermode == RENDER_FLAT){
-		print_d("Render mode set to Flat");
+		print_d("Render mode set to FLAT");
 	}else if(rendermode == RENDER_ISOMETRIC){
-		print_d("Isometric mapping is not yet implemented");
-		exit(1);
+		print_d("Render mode set to ISOMETRIC");
 	}else{
 		die("");
 	}
@@ -407,22 +511,36 @@ int map_world(bitmap_t *bitmap, const char *worldname, uint16_t region_count, co
 	uint32_t width = width_columns*16;
 	uint32_t height = height_columns*16;
 
-	printf_d("Allocating world pixel buffer (%ux%u)", width, height);
-	if(pnm_new(bitmap, width, height))
+	uint32_t bitmap_width = rendermode==RENDER_ISOMETRIC?width*ISOMETRIC_BLOCK_SIZE:width;
+	uint32_t bitmap_height = rendermode==RENDER_ISOMETRIC?height*ISOMETRIC_BLOCK_SIZE:height;
+
+	printf_d("Allocating world pixel buffer (%ux%u)", bitmap_width, bitmap_height);
+	if(pnm_new(bitmap, bitmap_width, bitmap_height))
 		die("Could not create pixel buffer");
-	memset(bitmap->pixels, 0, width*height*3);
+	memset(bitmap->pixels, 0, bitmap_width*bitmap_height*3);
 
 	bitmap_t region_bitmap;
-	printf_d("Allocating region pixel buffer (%ux%u)", 32*16, 32*16);
-	if(pnm_new(&region_bitmap, 32*16, 32*16))
-		die("Could not create pixel buffer");
-	memset(region_bitmap.pixels, 0, (32*16*32*16)*3);
-
 	bitmap_t column_bitmap;
-	printf_d("Allocating column pixel buffer (%ux%u)", 16, 16);
-	if(pnm_new(&column_bitmap, 16, 16))
-		die("Could not create pixel buffer");
-	memset(column_bitmap.pixels, 0, (16*16)*3);
+
+	if(rendermode == RENDER_ISOMETRIC){
+		printf_d("Allocating region pixel buffer (%ux%u)", 32*16*ISOMETRIC_BLOCK_SIZE, 32*16*ISOMETRIC_BLOCK_SIZE);
+		if(pnm_new(&region_bitmap, 32*16*ISOMETRIC_BLOCK_SIZE, 32*16*ISOMETRIC_BLOCK_SIZE))
+			die("Could not create pixel buffer");
+		memset(region_bitmap.pixels, 0, (32*16*ISOMETRIC_BLOCK_SIZE*32*16*ISOMETRIC_BLOCK_SIZE)*3);
+		printf_d("Allocating column pixel buffer (%ux%u)", 16*ISOMETRIC_BLOCK_SIZE, 16*ISOMETRIC_BLOCK_SIZE);
+		if(pnm_new(&column_bitmap, 16, 16))
+			die("Could not create pixel buffer");
+		memset(column_bitmap.pixels, 0, (16*16)*3);
+	}else{
+		printf_d("Allocating region pixel buffer (%ux%u)", 32*16, 32*16);
+		if(pnm_new(&region_bitmap, 32*16, 32*16))
+			die("Could not create pixel buffer");
+		memset(region_bitmap.pixels, 0, (32*16*32*16)*3);
+		printf_d("Allocating column pixel buffer (%ux%u)", 16, 16);
+		if(pnm_new(&column_bitmap, 16, 16))
+			die("Could not create pixel buffer");
+		memset(column_bitmap.pixels, 0, (16*16)*3);
+	}
 
 	int32_t x_start = 9001;
 	int32_t z_start = 9001;
@@ -447,60 +565,131 @@ int map_world(bitmap_t *bitmap, const char *worldname, uint16_t region_count, co
 	}
 	int32_t regions_x = x_end - x_start + 1;
 
-	for(int32_t x=-32;x<32;x++){
-		for(int32_t z=-32;z<32;z++){
-			if(region_allocation_map[x+32][z+32]){
+	if(rendermode == RENDER_FLAT){
+		for(int32_t x=-32;x<32;x++){
+			for(int32_t z=-32;z<32;z++){
+				if(region_allocation_map[x+32][z+32]){
 
-				printf_d("Mapping region %d,%d", x, z);
+					printf_d("Mapping region %d,%d", x, z);
 
-				FILE *regionfile = fopen(region_allocation_map[x+32][z+32], "rb");
-				if(!regionfile){
-					printf_d("Could not open region file for (%d,%d) \"%s\"",
-							x, z, region_allocation_map[x+32][z+32]);
-					continue;
-				}
-				map_region(&region_bitmap, &column_bitmap, regionfile, rendermode);
-				fclose(regionfile);
-
-				for(uint32_t col_x=0;col_x<32;col_x++){
-					if((int32_t)(x*32+col_x) < min_x || (int32_t)(x*32+col_x) > max_x)
+					FILE *regionfile = fopen(region_allocation_map[x+32][z+32], "rb");
+					if(!regionfile){
+						printf_d("Could not open region file for (%d,%d) \"%s\"",
+								x, z, region_allocation_map[x+32][z+32]);
 						continue;
+					}
+					map_region(&region_bitmap, &column_bitmap, regionfile, rendermode);
+					fclose(regionfile);
 
-					for(uint32_t col_z=0;col_z<32;col_z++){
-						if((int32_t)(z*32+col_z) < min_z || (int32_t)(z*32+col_z) > max_z)
+					for(uint32_t col_x=0;col_x<32;col_x++){
+						if((int32_t)(x*32+col_x) < min_x || (int32_t)(x*32+col_x) > max_x)
 							continue;
 
-						for(uint32_t block_x=0;block_x<16;block_x++){
-							for(uint32_t block_z=0;block_z<16;block_z++){
+						for(uint32_t col_z=0;col_z<32;col_z++){
+							if((int32_t)(z*32+col_z) < min_z || (int32_t)(z*32+col_z) > max_z)
+								continue;
 
-								uint32_t world_index = 0;
+							for(uint32_t block_x=0;block_x<16;block_x++){
+								for(uint32_t block_z=0;block_z<16;block_z++){
 
-								world_index += (z-z_start) * regions_x * 32*32 * 16*16;
-								world_index += (x-x_start) * 32*16;
-								world_index += col_z * regions_x * 32 * 16*16;
-								world_index += col_x * 16;
-								world_index += block_z * regions_x * 32 * 16;
-								world_index += block_x;
+									uint32_t world_index = 0;
 
-								uint32_t region_index = 0;
+									world_index += (z-z_start) * regions_x * 32*32 * 16*16;
+									world_index += (x-x_start) * 32*16;
+									world_index += col_z * regions_x * 32 * 16*16;
+									world_index += col_x * 16;
+									world_index += block_z * regions_x * 32 * 16;
+									world_index += block_x;
 
-								region_index += col_x * 32 * 16*16;
-								region_index += col_z * 16;
-								region_index += block_x * 32 * 16;
-								region_index += block_z;
+									uint32_t region_index = 0;
 
-								if(world_index > width*height){
-									printf_d("Column: %u,%u  Block: %u,%u  World: %ux%u = %u  i: %u",
-											col_x, col_z, block_x, block_z, width, height, width*height, world_index);
-									die("Block index went out of range!");
+									region_index += col_x * 32 * 16*16;
+									region_index += col_z * 16;
+									region_index += block_x * 32 * 16;
+									region_index += block_z;
+
+									if(world_index > width*height){
+										printf_d("Column: %u,%u  Block: %u,%u  World: %ux%u = %u  i: %u",
+												col_x, col_z, block_x, block_z, width, height, width*height, world_index);
+										die("Block index went out of range!");
+									}
+									memcpy(&bitmap->pixels[world_index*3], &region_bitmap.pixels[region_index*3], 3);
 								}
-								memcpy(&bitmap->pixels[world_index*3], &region_bitmap.pixels[region_index*3], 3);
 							}
 						}
 					}
 				}
 			}
 		}
+	}else if(rendermode == RENDER_ISOMETRIC){
+		int32_t i_start_z = 0;
+		int32_t i_end_x = 0;
+
+		for(uint32_t ia=0;(ia<64||ia<64);ia++){
+			i_start_z = ia;
+			i_end_x = ia;
+			int32_t z, x;
+
+			for(z=i_start_z, x=0;
+					z >= 0 && x <= i_end_x;
+					z--, x++){
+
+				if(region_allocation_map[x][z]){
+					printf_d("Mapping region %d,%d", x-32, z-32);
+
+					FILE *regionfile = fopen(region_allocation_map[x][z], "rb");
+					if(!regionfile){
+						printf_d("Could not open region file for (%d,%d) \"%s\"",
+								x-32, z-32, region_allocation_map[x][z]);
+						continue;
+					}
+					map_region(&region_bitmap, &column_bitmap, regionfile, rendermode);
+					fclose(regionfile);
+
+					for(uint32_t col_x=0;col_x<32;col_x++){
+						if((int32_t)(x*32+col_x) < min_x || (int32_t)(x*32+col_x) > max_x)
+							continue;
+
+						for(uint32_t col_z=0;col_z<32;col_z++){
+							if((int32_t)(z*32+col_z) < min_z || (int32_t)(z*32+col_z) > max_z)
+								continue;
+
+							for(uint32_t block_x=0;block_x<16;block_x++){
+								for(uint32_t block_z=0;block_z<16;block_z++){
+
+									uint32_t world_index = 0;
+
+									world_index += (z-z_start) * regions_x * 32*32 * 16*16;
+									world_index += (x-x_start) * 32*16;
+									world_index += col_z * regions_x * 32 * 16*16;
+									world_index += col_x * 16;
+									world_index += block_z * regions_x * 32 * 16;
+									world_index += block_x;
+
+									uint32_t region_index = 0;
+
+									region_index += col_x * 32 * 16*16;
+									region_index += col_z * 16;
+									region_index += block_x * 32 * 16;
+									region_index += block_z;
+
+									if(world_index > width*height){
+										printf_d("Column: %u,%u  Block: %u,%u  World: %ux%u = %u  i: %u",
+												col_x, col_z, block_x, block_z, width, height, width*height, world_index);
+										die("Block index went out of range!");
+									}
+									memcpy(&bitmap->pixels[world_index*3], &region_bitmap.pixels[region_index*3], 3);
+								}
+							}
+						}
+					}
+				}
+
+			}
+		}
+
+	}else{
+		return 1;
 	}
 
 	return 0;
@@ -533,9 +722,25 @@ int main(int argc, char *argv[]){
 		}
 	}
 
+	int rendermode = RENDER_ISOMETRIC;
+
+	if(get_bitmaps_blocks("blocks6.pnm") || get_bitmaps_data("data6.pnm")){
+		print_d("Warning: Could not parse blocks.pnm or data.pnm, needed for isometric rendering");
+		if(rendermode == RENDER_ISOMETRIC){
+			die("Can not render without block bitmaps");
+		}
+	}
+
 	bitmap_t bitmap_render;
 	memset(&bitmap_render, 0, sizeof(bitmap_t));
 
+
+	/*FILE *rf = fopen("testregions/loca/Midpoint/region/r.-1.0.mca", "rb");
+	pnm_new(&bitmap_render, 15*(ISOMETRIC_BLOCK_SIZE+2)+ISOMETRIC_BLOCK_SIZE,
+			(ISOMETRIC_BLOCK_SIZE+2)*16+(ISOMETRIC_BLOCK_SIZE/2+1-2)*256);
+	col_link_t cat[32*32];
+		populate_coltable(rf, cat, 0,0,0,0);
+	map_column(&bitmap_render, rf, &cat[19*32+7], RENDER_ISOMETRIC);*/
 	map_world(&bitmap_render, argv[1], argc-2, (const char**)argv+2, RENDER_FLAT);
 
 	if(!bitmap_render.pixels)

@@ -77,6 +77,8 @@
 	#define OSNAME "unknown_target"
 #endif
 
+#define ISOMETRIC_BLOCK_SIZE ((2+2-1)*2)
+
 #define die(text) do{fprintf(stderr, "[ERROR] %-14s %3d: %s\n", __FILE__, __LINE__, text); \
 		exit(1);}while(0)
 
