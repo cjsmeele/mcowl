@@ -53,6 +53,11 @@ int get_bitmaps_blocks(const char *filename){
 
 	size_t filesize = get_filesize(bmp_blocks_file);
 
+	if(filesize > 20 * 1024*1024){
+		printf_d("Blocks bitmap too large! (~%uMiB)", (uint32_t)(filesize/1024/1024));
+		return 1;
+	}
+
 	uint8_t *bmp_blocks = malloc(filesize);
 	if(!bmp_blocks) die("Could not allocate blocks bitmap file buffer");
 
@@ -73,6 +78,75 @@ int get_bitmaps_blocks(const char *filename){
 }
 int get_bitmaps_data(const char *filename){
 	memset(data_bitmaps, 0, 16*16*sizeof(bitmap_t));
+	return 0;
+}
+
+
+int pnm2png(const char *worldname, int rendermode){
+	char command[256];
+
+	const char *rendertext = 0;
+	switch(rendermode){
+	case RENDER_FLAT:
+		rendertext = "flat";
+		break;
+	case RENDER_DEPTH:
+		rendertext = "flat";
+		break;
+	case RENDER_HEIGHT:
+		rendertext = "heightmap";
+		break;
+	case RENDER_LIGHT:
+		rendertext = "lightmap";
+		break;
+	case RENDER_HIGHLIGHT:
+		rendertext = "highlight";
+		break;
+	case RENDER_ISOMETRIC:
+		rendertext = "isometric";
+		break;
+	default:
+		rendertext = "E";
+		break;
+	}
+
+	char pngfilename[256];
+	sprintf(pngfilename, "mcowl-%s-%s.png", worldname, rendertext);
+
+	switch(OSTYPE){
+	case OS_OTHER:
+	case OS_LINUX:
+	case OS_MACOS:
+		sprintf(command, "./pnm2png %s-%s", worldname, rendertext);
+		break;
+	case OS_WIN32:
+		sprintf(command, "pnm2png.exe %s-%s", worldname, rendertext);
+		break;
+	default:
+		die("whooooooops");
+		break;
+	}
+	int converter_exit = system(command);
+	if(converter_exit){
+		printf_d("pnm2png returned %d", converter_exit);
+		printf("\n  Either I could not execute pnm2png, or the program itself failed.\n"
+				"  If you're unhappy with the PNM file format, please convert it yourself.\n\n");
+		return 1;
+	}else{
+		FILE *png_check = fopen(pngfilename, "rb");
+		if(png_check){
+			print_d("File successfully converted");
+			printf("\n  PNG file saved as '%s'!\n\n", pngfilename);
+			fclose(png_check);
+		}else{
+			print_d("pnm2png reports success, but I can't find the PNG file!");
+			printf("\n  It seems something went wrong while converting.\n"
+					"  See if you can find a PNG file in my directory.\n"
+					"  If the PNG file does not exist you can use a tool like The GIMP to convert\n"
+					"  the world.pnm file yourself. Sorry :)\n\n");
+			return 1;
+		}
+	}
 	return 0;
 }
 
@@ -345,7 +419,7 @@ int check_allocated_regions(const char *region_allocation_map[64][64], const cha
 }
 
 int map_column(bitmap_t *bitmap, FILE *regionfile, col_link_t *col_link, int rendermode){
-	if(rendermode == RENDER_FLAT){
+	if(rendermode != RENDER_ISOMETRIC){
 		memset(bitmap->pixels, 0, 16*16*3);
 
 		block_t column_map[16][16];
@@ -370,7 +444,8 @@ int map_column(bitmap_t *bitmap, FILE *regionfile, col_link_t *col_link, int ren
 				for(uint8_t x=0;x<16;x++){
 					for(uint8_t z=0;z<16;z++){
 						if(!column_map[z][x].type && column.chunks[i].blocks[y][z][x].type){
-							if(!tranparency[column.chunks[i].blocks[y][z][x].type]){
+							if((rendermode != RENDER_DEPTH) ||// && rendermode != RENDER_HEIGHT) ||
+									!tranparency[column.chunks[i].blocks[y][z][x].type]){
 								column_map[z][x].type = column.chunks[i].blocks[y][z][x].type;
 								column_map[z][x].depth = i*16+y-64;
 								blocks_mapped++;
@@ -382,14 +457,43 @@ int map_column(bitmap_t *bitmap, FILE *regionfile, col_link_t *col_link, int ren
 							if(blocks_mapped >= 16*16)
 								break;
 						}
+						if(rendermode == RENDER_HIGHLIGHT){
+							switch(column.chunks[i].blocks[y][z][x].type){
+							case 55:
+							case 75:
+							case 76:
+							case 93:
+							case 94:
+							case 77:
+							case 69:
+							case 70:
+							case 72:
+								column_map[z][x].type = 137;
+								break;
+							case 54:
+								column_map[z][x].type = 138;
+								break;
+							case 71:
+							case 29:
+							case 33:
+								column_map[z][x].type = 139;
+								break;
+							case 50:
+							case 89:
+							case 123:
+							case 124:
+								column_map[z][x].type = 140;
+								break;
+							}
+						}
 					}
 				}
 			}
 		}
-		render_column_flat(bitmap, column_map);
+		render_column_flat(bitmap, column_map, rendermode);
 	}else{
 		int32_t s = ISOMETRIC_BLOCK_SIZE;
-		memset(bitmap->pixels, 0, (15*(s+2)+s) * ((s+2)*16+(s/2+1-2)*256));
+		memset(bitmap->pixels, 0, ISOMETRIC_COLUMN_WIDTH * ISOMETRIC_COLUMN_HEIGHT * 3);
 
 		column_t column;
 
@@ -432,6 +536,7 @@ int map_column(bitmap_t *bitmap, FILE *regionfile, col_link_t *col_link, int ren
 						real_z = ia*((s+2)/2/2) + ((s/2+1-2)*(255-block_y_total));
 						//bitmap->pixels[(real_z*(15*16+s)+real_x)*3+1] = 0xff;
 						uint8_t b = column.chunks[chunk_y].blocks[block_y][x][z].type;
+						if(b == 0) continue;
 						for(int32_t pz=0;pz<s;pz++){
 							for(int32_t px=0;px<s;px++){
 								if(!(block_bitmaps[b].pixels[(pz*s+px)*3+0] == 255 &&
@@ -453,7 +558,7 @@ int map_column(bitmap_t *bitmap, FILE *regionfile, col_link_t *col_link, int ren
 }
 
 int map_region(bitmap_t *bitmap, bitmap_t *column_bitmap, FILE *regionfile, int rendermode){
-	assert(rendermode == RENDER_FLAT);
+	assert(rendermode != RENDER_ISOMETRIC);
 	col_link_t cat[32*32];
 	populate_coltable(regionfile, cat, 0,0,0,0);
 
@@ -489,13 +594,8 @@ int map_region(bitmap_t *bitmap, bitmap_t *column_bitmap, FILE *regionfile, int 
 int map_world(bitmap_t *bitmap, const char *worldname, uint16_t region_count, const char *region_files[], int rendermode){
 	printf_d("Mapping world \"%s\"", worldname);
 
-	if(rendermode == RENDER_FLAT){
-		print_d("Render mode set to FLAT");
-	}else if(rendermode == RENDER_ISOMETRIC){
-		print_d("Render mode set to ISOMETRIC");
-	}else{
-		die("");
-	}
+	if(rendermode == RENDER_ISOMETRIC)
+		die("Isometric rendering is not yet supported");
 
 	const char *region_allocation_map[64][64];
 	int32_t min_x, min_z, max_x, max_z;
@@ -567,7 +667,7 @@ int map_world(bitmap_t *bitmap, const char *worldname, uint16_t region_count, co
 	}
 	int32_t regions_x = x_end - x_start + 1;
 
-	if(rendermode == RENDER_FLAT){
+	if(rendermode != RENDER_ISOMETRIC){
 		for(int32_t x=-32;x<32;x++){
 			for(int32_t z=-32;z<32;z++){
 				if(region_allocation_map[x+32][z+32]){
@@ -623,74 +723,8 @@ int map_world(bitmap_t *bitmap, const char *worldname, uint16_t region_count, co
 				}
 			}
 		}
-	}else if(rendermode == RENDER_ISOMETRIC){
-		int32_t i_start_z = 0;
-		int32_t i_end_x = 0;
-
-		for(uint32_t ia=0;(ia<64||ia<64);ia++){
-			i_start_z = ia;
-			i_end_x = ia;
-			int32_t z, x;
-
-			for(z=i_start_z, x=0;
-					z >= 0 && x <= i_end_x;
-					z--, x++){
-
-				if(region_allocation_map[x][z]){
-					printf_d("Mapping region %d,%d", x-32, z-32);
-
-					FILE *regionfile = fopen(region_allocation_map[x][z], "rb");
-					if(!regionfile){
-						printf_d("Could not open region file for (%d,%d) \"%s\"",
-								x-32, z-32, region_allocation_map[x][z]);
-						continue;
-					}
-					map_region(&region_bitmap, &column_bitmap, regionfile, rendermode);
-					fclose(regionfile);
-
-					for(uint32_t col_x=0;col_x<32;col_x++){
-						if((int32_t)(x*32+col_x) < min_x || (int32_t)(x*32+col_x) > max_x)
-							continue;
-
-						for(uint32_t col_z=0;col_z<32;col_z++){
-							if((int32_t)(z*32+col_z) < min_z || (int32_t)(z*32+col_z) > max_z)
-								continue;
-
-							for(uint32_t block_x=0;block_x<16;block_x++){
-								for(uint32_t block_z=0;block_z<16;block_z++){
-
-									uint32_t world_index = 0;
-
-									world_index += (z-z_start) * regions_x * 32*32 * 16*16;
-									world_index += (x-x_start) * 32*16;
-									world_index += col_z * regions_x * 32 * 16*16;
-									world_index += col_x * 16;
-									world_index += block_z * regions_x * 32 * 16;
-									world_index += block_x;
-
-									uint32_t region_index = 0;
-
-									region_index += col_x * 32 * 16*16;
-									region_index += col_z * 16;
-									region_index += block_x * 32 * 16;
-									region_index += block_z;
-
-									if(world_index > width*height){
-										printf_d("Column: %u,%u  Block: %u,%u  World: %ux%u = %u  i: %u",
-												col_x, col_z, block_x, block_z, width, height, width*height, world_index);
-										die("Block index went out of range!");
-									}
-									memcpy(&bitmap->pixels[world_index*3], &region_bitmap.pixels[region_index*3], 3);
-								}
-							}
-						}
-					}
-				}
-
-			}
-		}
 	}else{
-		return 1;
+		die("Isometric rendering is not yet supported");
 	}
 
 	pnm_free(&region_bitmap);
@@ -726,10 +760,10 @@ int main(int argc, char *argv[]){
 		}
 	}
 
-	int rendermode = RENDER_ISOMETRIC;
+	int rendermode = RENDER_DEPTH;
 
 	if(get_bitmaps_blocks("blocks6.pnm") || get_bitmaps_data("data6.pnm")){
-		print_d("Warning: Could not parse blocks.pnm or data.pnm, needed for isometric rendering");
+		//print_d("Warning: Could not parse blocks.pnm or data.pnm, needed for isometric rendering");
 		if(rendermode == RENDER_ISOMETRIC){
 			die("Can not render without block bitmaps");
 		}
@@ -740,12 +774,12 @@ int main(int argc, char *argv[]){
 
 
 	/*FILE *rf = fopen("testregions/loca/Midpoint/region/r.-1.0.mca", "rb");
-	pnm_new(&bitmap_render, 15*(ISOMETRIC_BLOCK_SIZE+2)+ISOMETRIC_BLOCK_SIZE,
-			(ISOMETRIC_BLOCK_SIZE+2)*16+(ISOMETRIC_BLOCK_SIZE/2+1-2)*256);
+	pnm_new(&bitmap_render, ISOMETRIC_COLUMN_WIDTH, ISOMETRIC_COLUMN_HEIGHT);
 	col_link_t cat[32*32];
 		populate_coltable(rf, cat, 0,0,0,0);
 	map_column(&bitmap_render, rf, &cat[19*32+7], RENDER_ISOMETRIC);*/
-	map_world(&bitmap_render, argv[1], argc-2, (const char**)argv+2, RENDER_FLAT);
+
+	map_world(&bitmap_render, argv[1], argc-2, (const char**)argv+2, rendermode);
 
 	if(!bitmap_render.pixels)
 		die("Render empty, no bitmap to write out!");
@@ -760,9 +794,6 @@ int main(int argc, char *argv[]){
 	print_d("Temporary image saved as 'world.pnm'");
 
 	FILE *pnm2png_check = 0;
-
-	char pngfilename[256];
-	sprintf(pngfilename, "mcowl-%s.png", worldname);
 
 	switch(OSTYPE){
 	case OS_LINUX:
@@ -780,45 +811,10 @@ int main(int argc, char *argv[]){
 		break;
 	}
 
-	int converter_exit = 7;
-
 	if(pnm2png_check){
 		fclose(pnm2png_check);
 		print_d("Trying to convert 'world.pnm' to a PNG file");
-		char command[256];
-
-		switch(OSTYPE){
-		case OS_OTHER:
-		case OS_LINUX:
-		case OS_MACOS:
-			sprintf(command, "./pnm2png %s", worldname);
-			break;
-		case OS_WIN32:
-			sprintf(command, "pnm2png.exe %s", worldname);
-			break;
-		default:
-			die("whooooooops");
-			break;
-		}
-		converter_exit = system(command);
-		if(converter_exit){
-			printf_d("pnm2png returned %d", converter_exit);
-			printf("\n  Either I could not execute pnm2png, or the program itself failed.\n"
-					"  If you're unhappy with the PNM file format, please convert it yourself.\n\n");
-		}else{
-			FILE *png_check = fopen(pngfilename, "rb");
-			if(png_check){
-				print_d("File successfully converted");
-				printf("\n  PNG file saved as '%s'!\n\n", pngfilename);
-				fclose(png_check);
-			}else{
-				print_d("pnm2png reports success, but I can't find the PNG file!");
-				printf("\n  It seems something went wrong while converting.\n"
-						"  See if you can find a PNG file in my directory.\n"
-						"  If the PNG file does not exist you can use a tool like The GIMP to convert\n"
-						"  the world.pnm file yourself. Sorry :)\n\n");
-			}
-		}
+		pnm2png(worldname, rendermode);
 	}else{
 		printf("\n  I could not find the pnm2png executable.\n"
 				"  If you're unhappy with the PNM file format, please convert it yourself.\n"

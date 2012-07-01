@@ -78,6 +78,8 @@
 #endif
 
 #define ISOMETRIC_BLOCK_SIZE ((2+2-1)*2)
+#define ISOMETRIC_COLUMN_WIDTH (15*(ISOMETRIC_BLOCK_SIZE+2)+ISOMETRIC_BLOCK_SIZE)
+#define ISOMETRIC_COLUMN_HEIGHT ((ISOMETRIC_BLOCK_SIZE+2)/2*16 + (ISOMETRIC_BLOCK_SIZE/2+1-2)*256)
 
 #define die(text) do{fprintf(stderr, "[ERROR] %-14s %3d: %s\n", __FILE__, __LINE__, text); \
 		exit(1);}while(0)
@@ -94,6 +96,10 @@
 
 enum RenderMode{
 	RENDER_FLAT=1,
+	RENDER_DEPTH,
+	RENDER_HEIGHT,
+	RENDER_LIGHT,
+	RENDER_HIGHLIGHT,
 	RENDER_ISOMETRIC
 };
 
@@ -133,6 +139,6 @@ static inline void* swap_bytes(void* s, size_t len){
 	return s;
 }
 
-int render_column_flat(bitmap_t *bitmap, block_t slice[16][16]);
+int render_column_flat(bitmap_t *bitmap, block_t slice[16][16], int rendermode);
 
 #endif /* MCOWL_H_ */

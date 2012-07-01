@@ -35,7 +35,7 @@ int render_column_iso(){
 	return 2;
 }
 
-int render_column_flat(bitmap_t *bitmap, block_t slice[16][16]){
+int render_column_flat(bitmap_t *bitmap, block_t slice[16][16], int rendermode){
 	assert(bitmap != NULL);
 	assert(bitmap->pixels != NULL);
 	memset(bitmap->pixels, 0, bitmap->width*bitmap->height*3);
@@ -48,7 +48,7 @@ int render_column_flat(bitmap_t *bitmap, block_t slice[16][16]){
 			color[2] = slice[x][z].type >= sizeof(color_legend)/3?0xff:color_legend[slice[x][z].type][2];
 
 			for(uint8_t color_i=0;color_i<3;color_i++){
-				if(slice[x][z].overlay_type){
+				if(rendermode == RENDER_DEPTH && slice[x][z].overlay_type){
 					color[color_i] *= (double)((double)(tranparency[slice[x][z].overlay_type])/256);
 					color[color_i] += (double)color_legend[slice[x][z].overlay_type][color_i]/256 *
 							(256-tranparency[slice[x][z].overlay_type]);
@@ -65,7 +65,15 @@ int render_column_flat(bitmap_t *bitmap, block_t slice[16][16]){
 					multiplier = 0.5;
 				}
 
-				color[color_i] *= multiplier;
+				if(rendermode == RENDER_DEPTH)
+					color[color_i] *= multiplier;
+				else if(rendermode == RENDER_HIGHLIGHT && slice[x][z].type < 137)
+					color[color_i] *= 0.5;
+
+				if(rendermode == RENDER_HEIGHT){
+					color[color_i] = slice[x][z].depth+64;
+				}
+
 
 				if(color[color_i] > 255) color[color_i] = 255;
 			}
