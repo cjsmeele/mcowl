@@ -26,66 +26,32 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MCOWL_H_
-#define MCOWL_H_
+#ifndef BITMAP_H_
+#define BITMAP_H_
 
-#define DEBUG (1)
-
-#include <stdio.h>
 #include <stdint.h>
-#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-
-#define die(text) do{fprintf(stderr, "[ERROR] %-14s %3d: %s\n", __FILE__, __LINE__, text); \
-		exit(1);}while(0)
-
-#define print_d(text) if(DEBUG){ \
-			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
-			fprintf(stderr, text "\n"); \
-		}
-
-#define printf_d(format, ...) if(DEBUG){ \
-			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
-			fprintf(stderr, format "\n", __VA_ARGS__); \
-		}
-
-enum RenderMode{
-	RENDER_FLAT=1,
-	RENDER_DEPTH,
-	RENDER_HEIGHT,
-	RENDER_LIGHT,
-	RENDER_HIGHLIGHT,
-};
+#define BITMAP_BYTES_PER_PIXEL 4 // RGBA
 
 typedef struct {
-	uint8_t type;
-	int16_t depth;
-	uint8_t overlay_type;
-} block_t;
+	int width;
+	int height;
+	uint8_t *pixels;
+} bitmap_t;
 
-typedef struct {
-	bool allocated;
-	block_t blocks[16][16][16];
-} chunk_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-typedef struct {
-	chunk_t chunks[16];
-	uint16_t allocated_b;
-} column_t;
+bitmap_t *bitmap_new(int width, int height);
+uint8_t *bitmap_at(bitmap_t *bitmap, int x, int y);
+int bitmap_writepnm(const bitmap_t *bitmap, FILE *outfile);
+int bitmap_free(bitmap_t *bitmap);
 
-typedef struct {
-	int32_t offset;
-	uint8_t length_sectors;
-} col_link_t;
-
-
-static inline void* swap_bytes(void* s, size_t len){
-	for(char *b=s, *e=b+len-1; b<e; b++,e--){
-		char t = *b;
-		*b = *e;
-		*e = t;
-	}
-	return s;
+#ifdef __cplusplus
 }
+#endif
 
-#endif /* MCOWL_H_ */
+#endif /* BITMAP_H_ */

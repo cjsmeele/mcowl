@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Chris Johan Smeele
+/* Copyright (c) 2012, 2013, Chris Smeele
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,32 +26,29 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "render.h"
 #include "mcowl.h"
-#include "legend.h"
+#include "blocks.h"
 
-
-int render_column_iso(){
-	print_d("Isometric mapping is not yet implemented");
-	return 2;
-}
+#include <string.h>
 
 int render_column_flat(bitmap_t *bitmap, block_t slice[16][16], int rendermode){
-	assert(bitmap != NULL);
-	assert(bitmap->pixels != NULL);
-	memset(bitmap->pixels, 0, bitmap->width*bitmap->height*3);
+	memset(bitmap->pixels, 0, bitmap->width * bitmap->height * BITMAP_BYTES_PER_PIXEL);
 
-	for(uint32_t z=0;z<16;z++){
-		for(uint32_t x=0;x<16;x++){
-			uint16_t color[3];
-			color[0] = slice[x][z].type >= sizeof(color_legend)/3?0xff:color_legend[slice[x][z].type][0];
-			color[1] = slice[x][z].type >= sizeof(color_legend)/3?0xff:color_legend[slice[x][z].type][1];
-			color[2] = slice[x][z].type >= sizeof(color_legend)/3?0xff:color_legend[slice[x][z].type][2];
+	for(uint32_t z=0; z<16; z++){
+		for(uint32_t x=0; x<16; x++){
+			uint16_t color[4];
+			// XXX sanitize type
+			color[0] = blockdescs[slice[x][z].type].color[0];
+			color[1] = blockdescs[slice[x][z].type].color[1];
+			color[2] = blockdescs[slice[x][z].type].color[2];
+			color[3] = blockdescs[slice[x][z].type].color[3];
 
-			for(uint8_t color_i=0;color_i<3;color_i++){
+			for(uint8_t color_i=0; color_i<4; color_i++){
 				if(rendermode == RENDER_DEPTH && slice[x][z].overlay_type){
-					color[color_i] *= (double)((double)(tranparency[slice[x][z].overlay_type])/256);
-					color[color_i] += (double)color_legend[slice[x][z].overlay_type][color_i]/256 *
-							(256-tranparency[slice[x][z].overlay_type]);
+					color[color_i] *= (double)((double)(blockdescs[slice[x][z].overlay_type].color[3])/256);
+					color[color_i] += (double)blockdescs[slice[x][z].overlay_type].color[color_i]/256 *
+							(256-blockdescs[slice[x][z].overlay_type].color[3]);
 				}
 				double multiplier = 1;
 				int16_t depth = slice[x][z].depth;
@@ -78,9 +75,10 @@ int render_column_flat(bitmap_t *bitmap, block_t slice[16][16], int rendermode){
 				if(color[color_i] > 255) color[color_i] = 255;
 			}
 
-			bitmap->pixels[(z*16+x)*3+0] = color[0];
-			bitmap->pixels[(z*16+x)*3+1] = color[1];
-			bitmap->pixels[(z*16+x)*3+2] = color[2];
+			bitmap->pixels[(z*16+x)*BITMAP_BYTES_PER_PIXEL+0] = color[0];
+			bitmap->pixels[(z*16+x)*BITMAP_BYTES_PER_PIXEL+1] = color[1];
+			bitmap->pixels[(z*16+x)*BITMAP_BYTES_PER_PIXEL+2] = color[2];
+			bitmap->pixels[(z*16+x)*BITMAP_BYTES_PER_PIXEL+3] = color[3];
 		}
 	}
 

@@ -26,66 +26,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MCOWL_H_
-#define MCOWL_H_
+#ifndef BLOCKS_H_
+#define BLOCKS_H_
 
-#define DEBUG (1)
-
-#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 
-
-#define die(text) do{fprintf(stderr, "[ERROR] %-14s %3d: %s\n", __FILE__, __LINE__, text); \
-		exit(1);}while(0)
-
-#define print_d(text) if(DEBUG){ \
-			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
-			fprintf(stderr, text "\n"); \
-		}
-
-#define printf_d(format, ...) if(DEBUG){ \
-			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
-			fprintf(stderr, format "\n", __VA_ARGS__); \
-		}
-
-enum RenderMode{
-	RENDER_FLAT=1,
-	RENDER_DEPTH,
-	RENDER_HEIGHT,
-	RENDER_LIGHT,
-	RENDER_HIGHLIGHT,
-};
-
 typedef struct {
-	uint8_t type;
-	int16_t depth;
-	uint8_t overlay_type;
-} block_t;
+	uint8_t color[4]; // RGBA
+	uint8_t highlight[4];
+	bool highlighted;
+} blockdesc_t;
 
-typedef struct {
-	bool allocated;
-	block_t blocks[16][16][16];
-} chunk_t;
+const blockdesc_t blockdescs[256];
 
-typedef struct {
-	chunk_t chunks[16];
-	uint16_t allocated_b;
-} column_t;
-
-typedef struct {
-	int32_t offset;
-	uint8_t length_sectors;
-} col_link_t;
-
-
-static inline void* swap_bytes(void* s, size_t len){
-	for(char *b=s, *e=b+len-1; b<e; b++,e--){
-		char t = *b;
-		*b = *e;
-		*e = t;
-	}
-	return s;
-}
-
-#endif /* MCOWL_H_ */
+#endif /* BLOCKS_H_ */

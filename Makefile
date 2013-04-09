@@ -1,27 +1,16 @@
-#CC=i686-pc-mingw32-gcc
-#CFLAGS=-O2 -Wall -pedantic -Wextra -std=c99 -I../../dev/cnbt-mingw -I../libpnm -I/usr/i686-pc-mingw32/usr/include/libnpg15
-#LDFLAGS=-L../libpnm -L../../dev/cnbt-mingw -L/usr/i686-pc-mingw32/usr/lib64
+#CFLAGS=-O0 -g3 -Wall -pedantic -Wextra -std=c99 -I../cnbt
+CFLAGS=-O3 -Wall -pedantic -Wextra -std=c99 -I../cnbt
+LDFLAGS=-L../cnbt
 
-CFLAGS=-O0 -g3 -Wall -pedantic -Wextra -std=c99 -I../../dev/cnbt -I../libpnm -I/usr/include/libnpg15
-LDFLAGS=-L../libpnm -L../../dev/cnbt
+all: mcowl
 
-all: mcowl pnm2png
+mcowl: mcowl.o render.o blocks.o bitmap.o
+	$(CC) $(LDFLAGS) mcowl.o render.o blocks.o bitmap.o -o mcowl -static -lnbt -lz
 
-mcowl: mcowl.o render.o
-	$(CC) $(LDFLAGS) mcowl.o render.o -o mcowl -static -lnbt -lpnm -lz
-
-pnm2png: pnm2png.o
-	$(CC) $(LDFLAGS) pnm2png.o -o pnm2png -static -lpnm -lpng -lz -lm 
-
-mcowl.o: mcowl.c mcowl.h
-render.o: render.c legend.h mcowl.h
-pnm2png.o: pnm2png.c
-
-# note: test regions are not yet included
-
-test: mcowl pnm2png
-	./mcowl testworld testregions/loca/Midpoint/region/*.mca
-#	./mcowl testworld testregions/loca/Midpoint/region/r.-1.0.mca
+mcowl.o:  mcowl.c  mcowl.h
+render.o: render.c render.h blocks.h mcowl.h
+blocks.o: blocks.c blocks.h
+bitmap.o: bitmap.c bitmap.h
 
 clean:
-	rm -f mcowl pnm2png *.o
+	rm -f mcowl *.o

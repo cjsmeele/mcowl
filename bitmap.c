@@ -26,66 +26,59 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MCOWL_H_
-#define MCOWL_H_
+#include "bitmap.h"
 
-#define DEBUG (1)
+int bitmap_allocate(bitmap_t *bitmap, int width, int height){
+	if(width <= 0 || height <= 0)
+		return 1;
+	bitmap->pixels = malloc(width * height * BITMAP_BYTES_PER_PIXEL);
+	if(!bitmap->pixels)
+		return 1;
+	bitmap->width = width;
+	bitmap->height = height;
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
-
-
-#define die(text) do{fprintf(stderr, "[ERROR] %-14s %3d: %s\n", __FILE__, __LINE__, text); \
-		exit(1);}while(0)
-
-#define print_d(text) if(DEBUG){ \
-			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
-			fprintf(stderr, text "\n"); \
-		}
-
-#define printf_d(format, ...) if(DEBUG){ \
-			fprintf(stderr, "[debug] %-14s %3d: ", __FILE__, __LINE__); \
-			fprintf(stderr, format "\n", __VA_ARGS__); \
-		}
-
-enum RenderMode{
-	RENDER_FLAT=1,
-	RENDER_DEPTH,
-	RENDER_HEIGHT,
-	RENDER_LIGHT,
-	RENDER_HIGHLIGHT,
-};
-
-typedef struct {
-	uint8_t type;
-	int16_t depth;
-	uint8_t overlay_type;
-} block_t;
-
-typedef struct {
-	bool allocated;
-	block_t blocks[16][16][16];
-} chunk_t;
-
-typedef struct {
-	chunk_t chunks[16];
-	uint16_t allocated_b;
-} column_t;
-
-typedef struct {
-	int32_t offset;
-	uint8_t length_sectors;
-} col_link_t;
-
-
-static inline void* swap_bytes(void* s, size_t len){
-	for(char *b=s, *e=b+len-1; b<e; b++,e--){
-		char t = *b;
-		*b = *e;
-		*e = t;
-	}
-	return s;
+	return 0;
 }
 
-#endif /* MCOWL_H_ */
+bitmap_t *bitmap_new(int width, int height){
+	if(width <= 0 || height <= 0)
+		return NULL;
+	bitmap_t *bitmap = (bitmap_t*)malloc(sizeof(bitmap_t));
+	if(!bitmap)
+		return NULL;
+	if(!bitmap_allocate(bitmap, width, height)){
+		return bitmap;
+	}else{
+		free(bitmap);
+		return NULL;
+	}
+}
+
+uint8_t *bitmap_at(bitmap_t *bitmap, int x, int y){
+	if(x < 0 || x > bitmap->width || 
+		y < 0 || y > bitmap->height)
+		return NULL;
+	return &bitmap->pixels[(y*bitmap->width + x) * BITMAP_BYTES_PER_PIXEL];
+}
+
+int bitmap_writepnm(const bitmap_t *bitmap, FILE *outfile){
+	if(fprintf(outfile, "P6\n%d %d\n%d\n", bitmap->width, bitmap->height, 255) < 0)
+		return 1;
+	for(int i=0; i<bitmap->width*bitmap->height*BITMAP_BYTES_PER_PIXEL; i++){
+		// Filter out alpha channel
+		if(!((i+1) % 4))
+			continue;
+		if(fputc(bitmap->pixels[i], outfile) < 0)
+			return 1;
+	}
+	return 0;
+}
+
+int bitmap_free(bitmap_t *bitmap){
+	if(bitmap){
+		if(bitmap->pixels)
+			free(bitmap->pixels);
+		free(bitmap);
+	}
+	return 0;
+}
