@@ -1,11 +1,11 @@
-#CFLAGS=-O0 -g3 -Wall -pedantic -Wextra -std=c99 -I../cnbt
-CFLAGS=-O3 -Wall -pedantic -Wextra -std=c99 -I../cnbt
-LDFLAGS=-L../cnbt
+CFLAGS=-g3 -Wall -pedantic -Wextra -std=c99 -I../cnbt
+#CFLAGS=-O3 -Wall -pedantic -Wextra -std=c99 -I../cnbt
+LDFLAGS=-static -L../cnbt -lnbt $(shell pkg-config --libs zlib)
 
 all: mcowl
 
 mcowl: mcowl.o render.o blocks.o bitmap.o
-	$(CC) $(LDFLAGS) mcowl.o render.o blocks.o bitmap.o -o mcowl -static -lnbt -lz
+	$(CC) -o mcowl mcowl.o render.o blocks.o bitmap.o $(LDFLAGS)
 
 mcowl.o:  mcowl.c  mcowl.h
 render.o: render.c render.h blocks.h mcowl.h
