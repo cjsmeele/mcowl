@@ -59,6 +59,7 @@ enum RenderMode{
 
 typedef struct {
 	uint8_t type;
+	uint8_t data;
 	int16_t depth;
 	uint8_t overlay_type;
 } block_t;

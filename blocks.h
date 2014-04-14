@@ -33,9 +33,8 @@
 #include <stdbool.h>
 
 typedef struct {
-	uint8_t color[4]; // RGBA
-	uint8_t highlight[4];
-	bool highlighted;
+	int color[4]; // RGBA
+	void (*get_color)(uint8_t type, uint8_t data, int *color[4]);
 } blockdesc_t;
 
 const blockdesc_t blockdescs[256];

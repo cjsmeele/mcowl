@@ -35,44 +35,40 @@
 int render_column_flat(bitmap_t *bitmap, block_t slice[16][16], int rendermode){
 	memset(bitmap->pixels, 0, bitmap->width * bitmap->height * BITMAP_BYTES_PER_PIXEL);
 
-	for(uint32_t z=0; z<16; z++){
-		for(uint32_t x=0; x<16; x++){
-			uint16_t color[4];
-			// XXX sanitize type
+	for(int z=0; z<16; z++){
+		for(int x=0; x<16; x++){
+			int color[3];
 			color[0] = blockdescs[slice[x][z].type].color[0];
 			color[1] = blockdescs[slice[x][z].type].color[1];
 			color[2] = blockdescs[slice[x][z].type].color[2];
-			color[3] = blockdescs[slice[x][z].type].color[3];
-
-			for(uint8_t color_i=0; color_i<4; color_i++){
+			if(blockdescs[slice[x][z].type].get_color){
+				blockdescs[slice[x][z].type].get_color(slice[x][z].type, slice[x][z].data, color);
+			}
+			for(int color_i=0; color_i<3; color_i++){
 				if(rendermode == RENDER_DEPTH && slice[x][z].overlay_type){
-					color[color_i] *= (double)((double)(blockdescs[slice[x][z].overlay_type].color[3])/256);
-					color[color_i] += (double)blockdescs[slice[x][z].overlay_type].color[color_i]/256 *
-							(256-blockdescs[slice[x][z].overlay_type].color[3]);
+					double alpha = (double)(blockdescs[slice[x][z].overlay_type].color[3]) / 255;
+					color[color_i]  = alpha * blockdescs[slice[x][z].overlay_type].color[color_i];
+					color[color_i] += (1 - alpha) * blockdescs[slice[x][z].type].color[color_i];
 				}
 				double multiplier = 1;
-				int16_t depth = slice[x][z].depth;
+				int depth = slice[x][z].depth;
 				if(depth > 30){
 					multiplier = 1.5;
 				}else if(depth >= 0){
 					multiplier += (double)depth/30/2;
 				}else if(depth >= -30){
-					multiplier += (double)depth/30/2;
+					multiplier += (double)depth/30/3;
 				}else{
 					multiplier = 0.5;
 				}
 
 				if(rendermode == RENDER_DEPTH)
 					color[color_i] *= multiplier;
-				else if(rendermode == RENDER_HIGHLIGHT && slice[x][z].type < 137)
-					color[color_i] *= 0.5;
-
-				if(rendermode == RENDER_HEIGHT){
+				else if(rendermode == RENDER_HEIGHT)
 					color[color_i] = slice[x][z].depth+64;
-				}
 
-
-				if(color[color_i] > 255) color[color_i] = 255;
+				if(color[color_i] > 255)
+					color[color_i] = 255;
 			}
 
 			bitmap->pixels[(z*16+x)*BITMAP_BYTES_PER_PIXEL+0] = color[0];

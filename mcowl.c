@@ -188,13 +188,12 @@ int get_column(column_t *column, nbt_node *coltree){
 		if(!chunk_nodes[i])
 			continue;
 		nbt_node *blocks = nbt_find_by_name(chunk_nodes[i], "Blocks");
-		if(!blocks){
+		if(!blocks)
 			die("Could not find Blocks tag");
-		}
 		if(blocks->type == TAG_BYTE_ARRAY){
 			struct nbt_byte_array *blocks_b = (struct nbt_byte_array*)&blocks->payload;
 
-			if (blocks_b->length != 16*16*16)
+			if(blocks_b->length != 16*16*16)
 				die("Incorrect chunk size");
 
 			for(uint32_t y=0; y<16; y++){
@@ -206,6 +205,28 @@ int get_column(column_t *column, nbt_node *coltree){
 			}
 		}else{
 			die("Blocks tag is not a byte array");
+		}
+		nbt_node *datas = nbt_find_by_name(chunk_nodes[i], "Data");
+		if(!datas)
+			die("Could not find Data tag");
+		if(datas->type == TAG_BYTE_ARRAY){
+			struct nbt_byte_array *datas_b = (struct nbt_byte_array*)&datas->payload;
+
+			if(datas_b->length != 16*16*16/2)
+				die("Incorrect chunk size");
+
+			for(uint32_t y=0; y<16; y++){
+				for(uint32_t x=0; x<16; x++){
+					for(uint32_t z=0; z<16; z++){
+						if(z&1)
+							column->chunks[i].blocks[y][x][z].data = datas_b->data[((y*16*16)+(x*16)+z)/2] >> 4;
+						else
+							column->chunks[i].blocks[y][x][z].data = datas_b->data[((y*16*16)+(x*16)+z)/2] & 0x0f;
+					}
+				}
+			}
+		}else{
+			die("Data tag is not a byte array");
 		}
 	}
 	
@@ -344,48 +365,19 @@ int map_column(bitmap_t *bitmap, FILE *regionfile, col_link_t *col_link, int ren
 			for(uint8_t x=0; x<16; x++){
 				for(uint8_t z=0; z<16; z++){
 					if(!column_map[z][x].type && column.chunks[i].blocks[y][z][x].type){
-						if((rendermode != RENDER_DEPTH) ||// && rendermode != RENDER_HEIGHT) ||
-							//!tranparency[column.chunks[i].blocks[y][z][x].type]){
-							!blockdescs[column.chunks[i].blocks[y][z][x].type].color[3]){
-								column_map[z][x].type = column.chunks[i].blocks[y][z][x].type;
-								column_map[z][x].depth = i*16+y-64;
-								blocks_mapped++;
-							}else{
-								if(blockdescs[column.chunks[i].blocks[y][z][x].type].color[3] != 255 &&
-										!column_map[z][x].overlay_type)
-									column_map[z][x].overlay_type = column.chunks[i].blocks[y][z][x].type;
-							}
+						if((rendermode != RENDER_DEPTH) ||
+								blockdescs[column.chunks[i].blocks[y][z][x].type].color[3] == 255){
+							column_map[z][x].type = column.chunks[i].blocks[y][z][x].type;
+							column_map[z][x].data = column.chunks[i].blocks[y][z][x].data;
+							column_map[z][x].depth = i*16+y-64;
+							blocks_mapped++;
+						}else{
+							if(blockdescs[column.chunks[i].blocks[y][z][x].type].color[3] &&
+									!column_map[z][x].overlay_type)
+								column_map[z][x].overlay_type = column.chunks[i].blocks[y][z][x].type;
+						}
 						if(blocks_mapped >= 16*16)
 							break;
-					}
-					if(rendermode == RENDER_HIGHLIGHT){
-						switch(column.chunks[i].blocks[y][z][x].type){
-							case 55:
-							case 75:
-							case 76:
-							case 93:
-							case 94:
-							case 77:
-							case 69:
-							case 70:
-							case 72:
-								column_map[z][x].type = 137;
-								break;
-							case 54:
-								column_map[z][x].type = 138;
-								break;
-							case 71:
-							case 29:
-							case 33:
-								column_map[z][x].type = 139;
-								break;
-							case 50:
-							case 89:
-							case 123:
-							case 124:
-								column_map[z][x].type = 140;
-								break;
-						}
 					}
 				}
 			}
